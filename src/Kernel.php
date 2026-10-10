@@ -57,6 +57,7 @@ final class Kernel implements RequestHandlerInterface
     {
         $requestId = $this->requestId($request);
         $request = $request->withAttribute('request_id', $requestId);
+        ResponseFactory::takeInvalidUtf8Count();
 
         $destination = new class($this) implements RequestHandlerInterface {
             public function __construct(private readonly Kernel $kernel)
@@ -79,6 +80,13 @@ final class Kernel implements RequestHandlerInterface
             // Reached when the middleware list has no ExceptionMiddleware, or
             // when middleware outside it throws.
             $response = (new ErrorRenderer($this->debug, $this->logger))->render($error, $requestId);
+        }
+
+        if (ResponseFactory::takeInvalidUtf8Count() > 0) {
+            $this->logger?->warning('API response contained invalid UTF-8; replaced with U+FFFD.', [
+                'request_id' => $requestId,
+                'path' => $request->path(),
+            ]);
         }
 
         return $response->header('X-Request-ID', $requestId);
