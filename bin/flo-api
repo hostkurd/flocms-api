@@ -1,0 +1,24 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+
+// FloCMS API commands. Run from the project root:
+//   php flo api:key:create "Mobile app" --scopes=properties.read
+//   vendor/bin/flo-api api:list
+
+$autoloadCandidates = [
+    // Installed as a dependency: <project>/vendor/hostkurd/flocms-api/bin/flo-api
+    __DIR__ . '/../../../autoload.php',
+    // Developing flocms-api itself
+    __DIR__ . '/../vendor/autoload.php',
+];
+
+foreach ($autoloadCandidates as $candidate) {
+    if (is_file($candidate)) {
+        require $candidate;
+        exit((new FloCMS\Api\Console\Application((string) getcwd()))->run(array_slice($argv, 1)));
+    }
+}
+
+fwrite(STDERR, "flo-api: Composer autoload.php not found. Run composer install.\n");
+exit(1);

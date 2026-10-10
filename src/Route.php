@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace FloCMS\Api;
 
+use Closure;
 use InvalidArgumentException;
 
 final class Route
@@ -20,6 +21,14 @@ final class Route
 
     /** @var list<string> */
     private array $parameterNames = [];
+
+    /**
+     * @var list<array{0: 'static', 1: string}|array{0: 'param', 1: string, 2: ?string}>
+     *      parameters carry their constraint, or null for the default one
+     */
+    private array $segments = [];
+
+    private ?Closure $nameListener = null;
 
     /** @param list<string> $methods */
     public function __construct(
@@ -70,6 +79,9 @@ final class Route
             throw new InvalidArgumentException('Invalid route name: ' . $name);
         }
         $this->routeName = $this->namePrefix . $name;
+        if ($this->nameListener !== null) {
+            ($this->nameListener)($this, $this->routeName);
+        }
 
         return $this;
     }
@@ -117,6 +129,27 @@ final class Route
         return $this->middleware;
     }
 
+    /**
+     * Called with ($route, $fullName) whenever the route is named.
+     *
+     * @internal used by Router to detect duplicate names
+     */
+    public function onName(Closure $listener): self
+    {
+        $this->nameListener = $listener;
+
+        return $this;
+    }
+
+    /**
+     * @internal
+     * @return list<array{0: 'static', 1: string}|array{0: 'param', 1: string, 2: ?string}>
+     */
+    public function segments(): array
+    {
+        return $this->segments;
+    }
+
     /** @return array<string, string>|null */
     public function matchPath(string $path): ?array
     {
@@ -152,6 +185,7 @@ final class Route
                 }
 
                 $constraint = $match[2] ?? null;
+                $this->segments[] = ['param', $name, $constraint];
                 if ($constraint === null) {
                     $constraint = '[^/]+';
                 } elseif ($constraint === '' || str_contains($constraint, '/')) {
@@ -169,6 +203,7 @@ final class Route
                 throw new InvalidArgumentException('Invalid route segment: ' . $part);
             }
 
+            $this->segments[] = ['static', $part];
             $regex .= '/' . preg_quote($part, '~');
         }
 

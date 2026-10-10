@@ -20,11 +20,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Only the extensions FloCMS requires on shared hosting.
+      # The extensions FloCMS requires on shared hosting, plus pdo_sqlite for
+      # the integration tests and pcntl for the concurrency tests.
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: pdo, pdo_mysql, pdo_sqlite, mbstring, fileinfo, gd
+          extensions: pdo, pdo_mysql, pdo_sqlite, mbstring, fileinfo, gd, pcntl
           coverage: none
           tools: composer:v2
 
@@ -35,7 +36,52 @@ jobs:
         run: composer update --no-interaction --no-progress --prefer-dist
 
       - name: Lint
-        run: find src tests -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
+        run: find src tests bin -name '*.php' -o -name 'flo-api' | xargs -n1 php -l > /dev/null
 
-      - name: Run tests
+      - name: Run tests (MySQL tests are skipped here)
         run: vendor/bin/phpunit
+
+  database:
+    name: ${{ matrix.db.name }} (PHP 8.3)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        db:
+          - { name: 'MariaDB 10.11', image: 'mariadb:10.11' }
+          - { name: 'MySQL 8.0', image: 'mysql:8.0' }
+
+    services:
+      db:
+        image: ${{ matrix.db.image }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MARIADB_ROOT_PASSWORD: root
+          MYSQL_DATABASE: flocms_api_test
+          MARIADB_DATABASE: flocms_api_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot || mariadb-admin ping -h 127.0.0.1 -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo, pdo_mysql, pdo_sqlite, mbstring, fileinfo, gd, pcntl
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer update --no-interaction --no-progress --prefer-dist
+
+      - name: Run integration tests against ${{ matrix.db.name }}
+        env:
+          FLO_TEST_MYSQL_HOST: 127.0.0.1
+          FLO_TEST_MYSQL_PORT: 3306
+          FLO_TEST_MYSQL_USER: root
+          FLO_TEST_MYSQL_PASS: root
+          FLO_TEST_MYSQL_NAME: flocms_api_test
+        run: vendor/bin/phpunit --testsuite integration

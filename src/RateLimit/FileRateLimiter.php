@@ -7,8 +7,41 @@ use RuntimeException;
 
 final class FileRateLimiter implements RateLimiterInterface
 {
-    public function __construct(private readonly string $directory)
+    /**
+     * @param int $gcProbability run gc() on roughly 1 in $gcProbability hits (0 disables)
+     * @param int $gcMaxAge seconds after the last hit before a state file is removed;
+     *        keep it longer than your longest window
+     */
+    public function __construct(
+        private readonly string $directory,
+        private readonly int $gcProbability = 100,
+        private readonly int $gcMaxAge = 86400
+    ) {
+    }
+
+    /**
+     * Delete state files not hit for $maxAge seconds. Returns how many were removed.
+     */
+    public function gc(?int $maxAge = null): int
     {
+        $maxAge ??= $this->gcMaxAge;
+        if (!is_dir($this->directory)) {
+            return 0;
+        }
+
+        $cutoff = time() - max(1, $maxAge);
+        $removed = 0;
+        foreach (glob(rtrim($this->directory, '/\\') . DIRECTORY_SEPARATOR . '*.json') ?: [] as $file) {
+            if (!preg_match('/^[0-9a-f]{64}\.json$/', basename($file))) {
+                continue;
+            }
+            $modified = @filemtime($file);
+            if ($modified !== false && $modified < $cutoff && @unlink($file)) {
+                $removed++;
+            }
+        }
+
+        return $removed;
     }
 
     public function hit(string $key, int $maxAttempts, int $windowSeconds): RateLimitResult
@@ -18,6 +51,9 @@ final class FileRateLimiter implements RateLimiterInterface
         }
 
         $this->ensureDirectory();
+        if ($this->gcProbability > 0 && random_int(1, $this->gcProbability) === 1) {
+            $this->gc();
+        }
         $path = $this->path($key);
         $handle = fopen($path, 'c+');
         if ($handle === false) {

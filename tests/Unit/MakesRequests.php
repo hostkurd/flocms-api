@@ -29,7 +29,9 @@ trait MakesRequests
             $server[$key] = $value;
         }
 
-        return new Request([], [], $server, [], [], $body);
+        parse_str((string) parse_url($uri, PHP_URL_QUERY), $query);
+
+        return new Request($query, [], $server, [], [], $body);
     }
 
     /** @return array<string, mixed> */

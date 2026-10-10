@@ -14,7 +14,12 @@
     "psr/log": "^1.1 || ^2.0 || ^3.0"
   },
   "require-dev": {
-    "phpunit/phpunit": "^10.5 || ^11.0"
+    "phpunit/phpunit": "^10.5 || ^11.0",
+    "hostkurd/flocms-uploader": "1.2.0"
+  },
+  "suggest": {
+    "hostkurd/flocms-uploader": "Uploads through the API (Uploads\\HandlesUploads), 1.2+ for chunked uploads.",
+    "ext-apcu": "Faster rate limiting with ApcuRateLimiter."
   },
   "autoload": {
     "psr-4": {
@@ -26,6 +31,9 @@
       "FloCMS\\Api\\Tests\\": "tests/"
     }
   },
+  "bin": [
+    "bin/flo-api"
+  ],
   "scripts": {
     "test": "phpunit",
     "test:unit": "phpunit --testsuite unit"
@@ -34,7 +42,7 @@
   "prefer-stable": true,
   "extra": {
     "branch-alias": {
-      "dev-main": "1.0-dev"
+      "dev-main": "1.1-dev"
     }
   }
 }

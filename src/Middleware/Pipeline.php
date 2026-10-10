@@ -16,7 +16,8 @@ final class Pipeline implements RequestHandlerInterface
     public function __construct(
         private readonly array $middleware,
         private readonly RequestHandlerInterface $destination,
-        private readonly ContainerInterface $container
+        private readonly ContainerInterface $container,
+        private readonly ?MiddlewareAliases $aliases = null
     ) {
     }
 
@@ -66,6 +67,8 @@ final class Pipeline implements RequestHandlerInterface
     {
         if (is_string($middleware) && class_exists($middleware)) {
             $middleware = $this->container->get($middleware);
+        } elseif (is_string($middleware) && $this->aliases?->has($middleware)) {
+            $middleware = $this->aliases->resolve($middleware);
         }
 
         if ($middleware instanceof MiddlewareInterface || is_callable($middleware)) {

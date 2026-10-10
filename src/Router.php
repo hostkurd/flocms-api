@@ -7,6 +7,7 @@ use FloCMS\Api\Exceptions\ApiException;
 use FloCMS\Api\Exceptions\MethodNotAllowedException;
 use FloCMS\Core\Http\Request;
 use InvalidArgumentException;
+use Psr\Log\LoggerInterface;
 
 final class Router
 {
@@ -17,6 +18,101 @@ final class Router
      * @var list<array{prefix: string, middleware: list<mixed>, module: ?string, name: string}>
      */
     private array $groups = [];
+
+    /** @var array<string, Route> */
+    private array $named = [];
+
+    /** @var list<string> */
+    private array $warnings = [];
+
+    /**
+     * @param bool $strict throw on shadowed routes and duplicate route names
+     *        instead of logging a warning (recommended in development)
+     */
+    public function __construct(
+        private ?LoggerInterface $logger = null,
+        private bool $strict = false
+    ) {
+    }
+
+    /**
+     * Throw InvalidArgumentException on shadowed routes and duplicate names.
+     * Without strict mode they are logged as warnings and listed by warnings().
+     */
+    public function strict(bool $strict = true): self
+    {
+        $this->strict = $strict;
+
+        return $this;
+    }
+
+    public function setLogger(?LoggerInterface $logger): self
+    {
+        $this->logger = $logger;
+
+        return $this;
+    }
+
+    /** @return list<string> Registration problems found outside strict mode. */
+    public function warnings(): array
+    {
+        return $this->warnings;
+    }
+
+    /**
+     * The path of a named route:
+     *
+     *     $router->url('properties.show', ['slug' => 'sea-villa'], ['page' => 2]);
+     *     // "/api/v1/properties/sea-villa?page=2"
+     *
+     * Parameters are checked against the route's constraints and URL-encoded.
+     * The path includes group prefixes and is relative to the host.
+     *
+     * @param array<string, string|int|float> $params
+     * @param array<string, mixed> $query
+     * @throws InvalidArgumentException for an unknown name or missing, unknown or invalid parameters
+     */
+    public function url(string $name, array $params = [], array $query = []): string
+    {
+        $route = $this->named[$name] ?? throw new InvalidArgumentException('Unknown route name: ' . $name);
+
+        $path = '';
+        $used = [];
+        foreach ($route->segments() as $segment) {
+            if ($segment[0] === 'static') {
+                $path .= '/' . $segment[1];
+                continue;
+            }
+
+            $param = $segment[1];
+            if (!array_key_exists($param, $params) || !is_scalar($params[$param]) || is_bool($params[$param])) {
+                throw new InvalidArgumentException('Route "' . $name . '" needs parameter "' . $param . '".');
+            }
+            // Requests are matched before decoding, so check the encoded form.
+            $value = rawurlencode((string) $params[$param]);
+            $constraint = $segment[2] ?? '[^/]+';
+            if ($value === '' || preg_match('~^(?:' . str_replace('~', '\~', $constraint) . ')$~D', $value) !== 1) {
+                throw new InvalidArgumentException('Parameter "' . $param . '" of route "' . $name . '" does not match ' . $constraint . '.');
+            }
+            $path .= '/' . $value;
+            $used[] = $param;
+        }
+
+        $unknown = array_diff(array_keys($params), $used);
+        if ($unknown !== []) {
+            throw new InvalidArgumentException('Route "' . $name . '" has no parameter(s): ' . implode(', ', $unknown) . '.');
+        }
+
+        $queryString = http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+
+        return ($path === '' ? '/' : $path) . ($queryString !== '' ? '?' . $queryString : '');
+    }
+
+    /** The route registered under $name, or null. */
+    public function named(string $name): ?Route
+    {
+        return $this->named[$name] ?? null;
+    }
 
     public function get(string $path, mixed $handler): Route
     {
@@ -79,8 +175,28 @@ final class Router
                     'Duplicate route for ' . implode('|', $route->methods()) . ' ' . $pattern
                 );
             }
+            if (
+                array_intersect($existing->methods(), $route->methods()) !== []
+                && self::covers($existing, $route)
+            ) {
+                $this->report(
+                    'Route ' . implode('|', $route->methods()) . ' ' . $pattern
+                    . ' can never match: ' . $existing->pattern()
+                    . ' is registered first and matches the same paths.'
+                );
+            }
         }
 
+        $route->onName(function (Route $named, string $name): void {
+            $existing = $this->named[$name] ?? null;
+            if ($existing !== null && $existing !== $named) {
+                $this->report('Duplicate route name "' . $name . '" (' . $existing->pattern()
+                    . ' and ' . $named->pattern() . ').');
+
+                return;
+            }
+            $this->named[$name] = $named;
+        });
         $this->routes[] = $route;
 
         return $route;
@@ -110,6 +226,26 @@ final class Router
         } finally {
             array_pop($this->groups);
         }
+    }
+
+    /**
+     * A group for one API version: prefix "/v1" and route names "v1.".
+     *
+     *     $router->version('v1', function (Router $router): void {
+     *         $router->get('/properties', ...)->name('properties.index'); // v1.properties.index
+     *     });
+     *
+     * @param callable(self): void $routes
+     * @param list<mixed> $middleware
+     */
+    public function version(string $version, callable $routes, array $middleware = []): void
+    {
+        if (!preg_match('/^v?[0-9]+(\.[0-9]+)?$/', $version)) {
+            throw new InvalidArgumentException('Invalid API version: ' . $version);
+        }
+        $version = 'v' . ltrim($version, 'v');
+
+        $this->group('/' . $version, $routes, $middleware, namePrefix: $version . '.');
     }
 
     public function match(Request $request): RouteMatch
@@ -199,6 +335,46 @@ final class Router
     public function routes(): array
     {
         return $this->routes;
+    }
+
+    /**
+     * Whether every path $later matches is already matched by $earlier.
+     * Routes match first-registered first, so $later would be unreachable.
+     */
+    private static function covers(Route $earlier, Route $later): bool
+    {
+        $a = $earlier->segments();
+        $b = $later->segments();
+        if (count($a) !== count($b)) {
+            return false;
+        }
+
+        foreach ($a as $index => $segment) {
+            $other = $b[$index];
+            if ($segment[0] === 'param' && $segment[2] === null) {
+                continue; // an unconstrained parameter matches any one segment
+            }
+            if ($segment[0] === 'static' && $other[0] === 'static' && $segment[1] === $other[1]) {
+                continue;
+            }
+            if ($segment[0] === 'param' && $other[0] === 'param' && $segment[2] === $other[2]) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function report(string $message): void
+    {
+        if ($this->strict) {
+            throw new InvalidArgumentException($message);
+        }
+
+        $this->warnings[] = $message;
+        $this->logger?->warning('API route registration: ' . $message);
     }
 
     public static function normalizePath(string $path): string

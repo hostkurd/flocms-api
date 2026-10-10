@@ -7,8 +7,11 @@ use Closure;
 use FloCMS\Api\Contracts\RequestHandlerInterface;
 use FloCMS\Api\Exceptions\ApiException;
 use FloCMS\Api\Middleware\ExceptionMiddleware;
+use FloCMS\Api\Middleware\MiddlewareAliases;
 use FloCMS\Api\Middleware\Pipeline;
 use FloCMS\Api\Middleware\SecurityHeadersMiddleware;
+use FloCMS\Api\Resources\JsonResource;
+use FloCMS\Api\Resources\Resolvable;
 use FloCMS\Api\Support\ErrorRenderer;
 use FloCMS\Core\Http\Request;
 use FloCMS\Core\Http\Response;
@@ -29,6 +32,10 @@ final class Kernel implements RequestHandlerInterface
     /** @var list<mixed> */
     private array $middleware = [];
 
+    private ?MiddlewareAliases $aliases = null;
+
+    private bool $requestIdInBody = false;
+
     public function __construct(
         private readonly Router $router,
         private readonly ContainerInterface $container = new Container(),
@@ -47,6 +54,36 @@ final class Kernel implements RequestHandlerInterface
         return $this;
     }
 
+    /**
+     * Register middleware aliases such as 'throttle' for 'throttle:forms'.
+     *
+     * @param MiddlewareAliases|array<string, callable> $aliases
+     */
+    public function aliases(MiddlewareAliases|array $aliases): self
+    {
+        if (is_array($aliases)) {
+            $registry = $this->aliases ?? new MiddlewareAliases();
+            foreach ($aliases as $name => $factory) {
+                $registry->register($name, $factory);
+            }
+            $aliases = $registry;
+        }
+        $this->aliases = $aliases;
+
+        return $this;
+    }
+
+    /**
+     * Also put the request ID in success bodies ("request_id"), as error
+     * bodies already have it. It is always in the X-Request-ID header.
+     */
+    public function includeRequestIdInBody(bool $enabled = true): self
+    {
+        $this->requestIdInBody = $enabled;
+
+        return $this;
+    }
+
     public function pipe(mixed $middleware): self
     {
         $this->middleware[] = $middleware;
@@ -59,6 +96,7 @@ final class Kernel implements RequestHandlerInterface
         $requestId = $this->requestId($request);
         $request = $request->withAttribute('request_id', $requestId);
         ResponseFactory::takeInvalidUtf8Count();
+        ResponseFactory::setBodyRequestId($this->requestIdInBody ? $requestId : null);
 
         $destination = new class($this) implements RequestHandlerInterface {
             public function __construct(private readonly Kernel $kernel)
@@ -75,7 +113,8 @@ final class Kernel implements RequestHandlerInterface
             $response = (new Pipeline(
                 $this->middleware,
                 $destination,
-                $this->container
+                $this->container,
+                $this->aliases
             ))->handle($request);
         } catch (Throwable $error) {
             // Reached when the middleware list has no ExceptionMiddleware, or
@@ -84,6 +123,7 @@ final class Kernel implements RequestHandlerInterface
             $this->addMissingSecurityHeaders($response);
         }
 
+        ResponseFactory::setBodyRequestId(null);
         if (ResponseFactory::takeInvalidUtf8Count() > 0) {
             $this->logger?->warning('API response contained invalid UTF-8; replaced with U+FFFD.', [
                 'request_id' => $requestId,
@@ -141,7 +181,8 @@ final class Kernel implements RequestHandlerInterface
         $response = (new Pipeline(
             $route->middlewareStack(),
             $destination,
-            $this->container
+            $this->container,
+            $this->aliases
         ))->handle($request);
 
         return $request->method() === 'HEAD' ? $response->withoutBody() : $response;
@@ -153,7 +194,7 @@ final class Kernel implements RequestHandlerInterface
         $arguments = $this->resolveArguments($reflection, $request);
         $result = $callable(...$arguments);
 
-        return $this->normalizeResponse($result);
+        return $this->normalizeResponse($result, $request);
     }
 
     /** @return array{0: callable, 1: ReflectionFunctionAbstract} */
@@ -262,10 +303,15 @@ final class Kernel implements RequestHandlerInterface
         };
     }
 
-    private function normalizeResponse(mixed $result): Response
+    private function normalizeResponse(mixed $result, Request $request): Response
     {
         if ($result instanceof Response) {
             return $result;
+        }
+        if ($result instanceof Resolvable) {
+            JsonResource::assertIncludes($request, $result->allowedIncludes());
+
+            return ResponseFactory::success($result->resolve($request), 200, $result->meta($request));
         }
         if ($result === null) {
             return Response::noContent();

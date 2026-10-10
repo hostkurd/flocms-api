@@ -13,14 +13,16 @@ use FloCMS\Core\Http\Response;
 final class AuthenticateMiddleware implements MiddlewareInterface
 {
     /**
-     * @param list<string> $roles
-     * @param list<string> $scopes
+     * @param list<string> $roles any of these roles (empty: no role check)
+     * @param list<string> $scopes all of these scopes
+     * @param list<string> $permissions all of these permissions (Identity::can())
      */
     public function __construct(
         private readonly AuthenticatorInterface $authenticator,
         private readonly string $guard = 'default',
         private readonly array $roles = [],
-        private readonly array $scopes = []
+        private readonly array $scopes = [],
+        private readonly array $permissions = []
     ) {
     }
 
@@ -32,6 +34,9 @@ final class AuthenticateMiddleware implements MiddlewareInterface
         }
         if (!$identity->hasAnyRole($this->roles) || !$identity->hasScopes($this->scopes)) {
             throw new ApiException('You do not have permission to access this resource.', 403);
+        }
+        foreach ($this->permissions as $permission) {
+            $identity->authorize($permission);
         }
 
         return $handler->handle(
