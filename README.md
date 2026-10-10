@@ -76,3 +76,47 @@ Module route files are declared in `module.php`:
 The route loader marks every route from that file with its owning module.
 Requests to a disabled or outdated module receive a 404 without constructing
 the controller.
+
+## Errors and validation
+
+Errors use one JSON envelope:
+
+```json
+{"success": false, "message": "Validation failed.", "errors": {"email": ["Required."]}, "request_id": "…"}
+```
+
+Every response, success or error, carries the request ID in the
+`X-Request-ID` header.
+
+### Which ValidationException?
+
+Two classes exist, and both render as `422 Validation failed.` with the field
+errors under `errors`:
+
+- `FloCMS\Api\Exceptions\ValidationException` is the one to use in API code.
+  Throw it directly or through `Controller::invalid(['field' => ['message']])`.
+- `FloCMS\Core\ValidationException` is thrown by core `Validator::validate()`.
+  Since 1.0.1 the API renders it the same way, so calling the core validator
+  from an API handler is safe. Before 1.0.1 it became a 500.
+
+Invalid UTF-8 in data passed to `ResponseFactory` (and therefore in arrays
+returned from handlers) is replaced with U+FFFD and logged as a warning. A
+handler that builds its own response with core `Response::json()` keeps
+core's strict behaviour.
+
+## Middleware order
+
+Middleware is listed outermost first. The recommended order:
+
+```php
+$kernel->middleware([
+    new SecurityHeadersMiddleware(),          // headers on every response, errors included
+    new ExceptionMiddleware(debug: $debug),   // renders errors as JSON
+    new CorsMiddleware($origins),             // answers preflights, decorates errors too
+    new RateLimitMiddleware(/* ... */),       // OPTIONS requests are not counted
+    new JsonBodyMiddleware(),
+]);
+```
+
+If the list has no `ExceptionMiddleware`, the Kernel still renders errors with
+their own status, request ID and security headers.

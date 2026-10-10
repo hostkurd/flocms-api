@@ -151,8 +151,10 @@ final class Route
                     throw new InvalidArgumentException('Duplicate route parameter: ' . $name);
                 }
 
-                $constraint = $match[2] ?? '[^/]+';
-                if ($constraint === '' || str_contains($constraint, '/')) {
+                $constraint = $match[2] ?? null;
+                if ($constraint === null) {
+                    $constraint = '[^/]+';
+                } elseif ($constraint === '' || str_contains($constraint, '/')) {
                     throw new InvalidArgumentException(
                         'Route parameter constraints must match one path segment: ' . $name
                     );

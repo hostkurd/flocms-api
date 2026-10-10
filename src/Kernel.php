@@ -8,6 +8,8 @@ use FloCMS\Api\Contracts\RequestHandlerInterface;
 use FloCMS\Api\Exceptions\ApiException;
 use FloCMS\Api\Middleware\ExceptionMiddleware;
 use FloCMS\Api\Middleware\Pipeline;
+use FloCMS\Api\Middleware\SecurityHeadersMiddleware;
+use FloCMS\Api\Support\ErrorRenderer;
 use FloCMS\Core\Http\Request;
 use FloCMS\Core\Http\Response;
 use FloCMS\Core\Modules\ModuleManager;
@@ -56,6 +58,7 @@ final class Kernel implements RequestHandlerInterface
     {
         $requestId = $this->requestId($request);
         $request = $request->withAttribute('request_id', $requestId);
+        ResponseFactory::takeInvalidUtf8Count();
 
         $destination = new class($this) implements RequestHandlerInterface {
             public function __construct(private readonly Kernel $kernel)
@@ -75,17 +78,17 @@ final class Kernel implements RequestHandlerInterface
                 $this->container
             ))->handle($request);
         } catch (Throwable $error) {
-            $this->logger?->error('API middleware pipeline failed.', [
-                'exception' => get_class($error),
-                'message' => $error->getMessage(),
+            // Reached when the middleware list has no ExceptionMiddleware, or
+            // when middleware outside it throws.
+            $response = (new ErrorRenderer($this->debug, $this->logger))->render($error, $requestId);
+            $this->addMissingSecurityHeaders($response);
+        }
+
+        if (ResponseFactory::takeInvalidUtf8Count() > 0) {
+            $this->logger?->warning('API response contained invalid UTF-8; replaced with U+FFFD.', [
                 'request_id' => $requestId,
+                'path' => $request->path(),
             ]);
-            $response = ResponseFactory::error(
-                $this->debug ? $error->getMessage() : 'Internal Server Error',
-                500,
-                [],
-                $requestId
-            );
         }
 
         return $response->header('X-Request-ID', $requestId);
@@ -269,6 +272,17 @@ final class Kernel implements RequestHandlerInterface
         }
 
         return ResponseFactory::success($result);
+    }
+
+    /** Error responses that bypassed SecurityHeadersMiddleware still get its headers. */
+    private function addMissingSecurityHeaders(Response $response): void
+    {
+        $present = array_map('strtolower', array_keys($response->headers()));
+        foreach (SecurityHeadersMiddleware::HEADERS as $name => $value) {
+            if (!in_array(strtolower($name), $present, true)) {
+                $response->header($name, $value);
+            }
+        }
     }
 
     private function requestId(Request $request): string

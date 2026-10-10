@@ -30,6 +30,11 @@ final class RateLimitMiddleware implements MiddlewareInterface
 
     public function process(Request $request, RequestHandlerInterface $handler): Response
     {
+        // OPTIONS (CORS preflights, Allow discovery) never runs a handler.
+        if ($request->method() === 'OPTIONS') {
+            return $handler->handle($request);
+        }
+
         $subject = $this->keyResolver !== null
             ? (string) ($this->keyResolver)($request)
             : $this->clientIp->resolve($request);
