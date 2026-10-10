@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace FloCMS\Api;
 
+use DateTimeInterface;
 use FloCMS\Api\Pagination\Links;
 use FloCMS\Api\Resources\JsonResource;
 use FloCMS\Core\Http\Request;
@@ -142,6 +143,25 @@ final class ResponseFactory
         }
 
         return array_map(static fn (mixed $row): mixed => JsonResource::resolveValue($map($row), $request), $rows);
+    }
+
+    /**
+     * Set Last-Modified (HTTP date, GMT) so ETagMiddleware can answer
+     * If-Modified-Since with 304. Accepts a timestamp, a date string (e.g. an
+     * updated_at column) or a DateTimeInterface.
+     */
+    public static function withLastModified(Response $response, DateTimeInterface|int|string $modified): Response
+    {
+        $timestamp = match (true) {
+            $modified instanceof DateTimeInterface => $modified->getTimestamp(),
+            is_int($modified) => $modified,
+            default => strtotime($modified),
+        };
+        if ($timestamp === false) {
+            throw new InvalidArgumentException('Invalid Last-Modified value: ' . $modified);
+        }
+
+        return $response->header('Last-Modified', gmdate('D, d M Y H:i:s', $timestamp) . ' GMT');
     }
 
     /**
