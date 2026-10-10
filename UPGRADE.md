@@ -1,5 +1,33 @@
 # Upgrade guide
 
+## 1.1 to 1.2
+
+1.2 moves the `api:*` commands into the FloCMS CLI. It requires
+`hostkurd/flocms-cli` 2.0 (PHP 8.1, flocms-core 2.2). Update the pins
+(FloCMS 1.7 does this for you):
+
+```json
+"hostkurd/flocms-cli": "2.0.0",
+"hostkurd/flocms-api": "1.2.0"
+```
+
+and follow flocms-cli's UPGRADE.md for the one-time replacement of the root
+`flo` file.
+
+What changes for you:
+
+- **Commands.** `php flo api:*` commands have the same names, options and
+  output. Invalid usage (a missing argument) now exits with 2 instead of 1
+  when run through `php flo`. `vendor/bin/flo-api` and
+  `Console\Application` keep 1.1's exit codes.
+- **Schema.** The schema is a migration. Run `php flo migrate` (or
+  `php flo api:install-schema`). If you installed the schema with 1.0/1.1,
+  nothing is changed: the migration is only recorded.
+- **Custom commands.** Code that added commands with
+  `Console\Application::register()` keeps working. New commands should be
+  flocms-cli commands, in your `commands/` folder.
+- **Route list.** `php flo route:list` now includes the API routes.
+
 ## 1.0 to 1.1
 
 1.1 is backward compatible: no public class, method or argument was removed or

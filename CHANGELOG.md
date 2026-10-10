@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.2.0 - unreleased
+
+Requires hostkurd/flocms-cli 2.0 (and so flocms-core 2.2). See UPGRADE.md.
+
+### Changed
+- The `api:*` commands are flocms-cli commands
+  (`FloCMS\Api\Console\Commands\*`), registered in composer.json
+  `extra.flocms.commands`. `php flo api:...` runs them on every FloCMS site
+  without the skeleton forwarding them, and they get the CLI's help,
+  `--help`, "Did you mean" suggestions (`api:create:schema` ->
+  `api:install-schema`), exit codes (2 for invalid usage) and errors on
+  STDERR. Names, options, messages and output are unchanged (A1).
+- `api:install-schema` is a migration
+  (`database/migrations/2026_10_10_000000_create_api_tables.php`),
+  published through `extra.flocms.migrations`: `php flo migrate` creates
+  the API tables with the application's migrations, `migrate:rollback`
+  drops them. Existing tables are kept and the migration is recorded (B2).
+- The API database for commands comes from the CLI's project settings
+  (`.env`, including `DB_TYPE=sqlite` and `DB_DSN`); `FLO_API_DSN` still
+  wins when set.
+- `php flo route:list` includes `api/routes.php` (route provider) and
+  `php flo schedule:run` runs `api:gc` daily.
+- `bin/flo-api` finds the project from `vendor/`, not the current directory.
+
+### Deprecated
+- `FloCMS\Api\Console\Application`: it keeps the 1.1 API and behavior
+  (invalid usage exits with 1) for `vendor/bin/flo-api` and existing code.
+  Use `php flo` and flocms-cli's `ApplicationTester` instead.
+
+### Quality
+- CI also runs on Windows (PHP 8.1 and 8.4).
+
 ## 1.1.0 - unreleased
 
 New features are opt-in and backward compatible. See UPGRADE.md.

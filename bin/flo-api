@@ -2,21 +2,26 @@
 <?php
 declare(strict_types=1);
 
-// FloCMS API commands. Run from the project root:
+// FloCMS API commands. With flocms-cli 2 they are part of `php flo`:
 //   php flo api:key:create "Mobile app" --scopes=properties.read
-//   vendor/bin/flo-api api:list
+//   php flo list api
+// This script runs only the API commands: vendor/bin/flo-api api:list
 
 $autoloadCandidates = [
+    // Composer's bin proxy tells us where the autoloader is (Composer 2.2+)
+    $GLOBALS['_composer_autoload_path'] ?? null,
     // Installed as a dependency: <project>/vendor/hostkurd/flocms-api/bin/flo-api
     __DIR__ . '/../../../autoload.php',
     // Developing flocms-api itself
     __DIR__ . '/../vendor/autoload.php',
 ];
 
-foreach ($autoloadCandidates as $candidate) {
+foreach (array_filter($autoloadCandidates) as $candidate) {
     if (is_file($candidate)) {
         require $candidate;
-        exit((new FloCMS\Api\Console\Application((string) getcwd()))->run(array_slice($argv, 1)));
+        // <project>/vendor/autoload.php -> <project>, never the current directory
+        $root = FloCMS\CLI\Project::fromLauncher(dirname((string) realpath($candidate), 2))->root();
+        exit((new FloCMS\Api\Console\Application($root))->run(array_slice($argv, 1)));
     }
 }
 

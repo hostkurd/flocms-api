@@ -11,7 +11,8 @@
   "require": {
     "php": "^8.1",
     "hostkurd/flocms-core": "^2.0",
-    "psr/log": "^1.1 || ^2.0 || ^3.0"
+    "psr/log": "^1.1 || ^2.0 || ^3.0",
+    "hostkurd/flocms-cli": "^2.0"
   },
   "require-dev": {
     "phpunit/phpunit": "^10.5 || ^11.0",
@@ -42,7 +43,28 @@
   "prefer-stable": true,
   "extra": {
     "branch-alias": {
-      "dev-main": "1.1-dev"
+      "dev-main": "1.2-dev"
+    },
+    "flocms": {
+      "commands": [
+        "FloCMS\\Api\\Console\\Commands\\ListCommand",
+        "FloCMS\\Api\\Console\\Commands\\InstallSchemaCommand",
+        "FloCMS\\Api\\Console\\Commands\\KeyCreateCommand",
+        "FloCMS\\Api\\Console\\Commands\\KeyListCommand",
+        "FloCMS\\Api\\Console\\Commands\\KeyRevokeCommand",
+        "FloCMS\\Api\\Console\\Commands\\TokenCreateCommand",
+        "FloCMS\\Api\\Console\\Commands\\TokenListCommand",
+        "FloCMS\\Api\\Console\\Commands\\TokenRevokeCommand",
+        "FloCMS\\Api\\Console\\Commands\\GcCommand",
+        "FloCMS\\Api\\Console\\Commands\\RoutesCommand",
+        "FloCMS\\Api\\Console\\Commands\\DocsCommand"
+      ],
+      "migrations": [
+        "database/migrations"
+      ],
+      "route-providers": [
+        "FloCMS\\Api\\Console\\Commands\\ApiRoutes"
+      ]
     }
   }
 }
