@@ -8,6 +8,7 @@ use FloCMS\Api\Contracts\RequestHandlerInterface;
 use FloCMS\Api\Exceptions\ApiException;
 use FloCMS\Api\Middleware\ExceptionMiddleware;
 use FloCMS\Api\Middleware\Pipeline;
+use FloCMS\Api\Support\ErrorRenderer;
 use FloCMS\Core\Http\Request;
 use FloCMS\Core\Http\Response;
 use FloCMS\Core\Modules\ModuleManager;
@@ -75,17 +76,9 @@ final class Kernel implements RequestHandlerInterface
                 $this->container
             ))->handle($request);
         } catch (Throwable $error) {
-            $this->logger?->error('API middleware pipeline failed.', [
-                'exception' => get_class($error),
-                'message' => $error->getMessage(),
-                'request_id' => $requestId,
-            ]);
-            $response = ResponseFactory::error(
-                $this->debug ? $error->getMessage() : 'Internal Server Error',
-                500,
-                [],
-                $requestId
-            );
+            // Reached when the middleware list has no ExceptionMiddleware, or
+            // when middleware outside it throws.
+            $response = (new ErrorRenderer($this->debug, $this->logger))->render($error, $requestId);
         }
 
         return $response->header('X-Request-ID', $requestId);
