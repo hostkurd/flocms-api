@@ -40,7 +40,7 @@ final class FileIdempotencyStore implements IdempotencyStore
 
     public function complete(string $key, array $response, int $ttlSeconds): void
     {
-        $this->locked($key, function ($handle) use ($response, $ttlSeconds): null {
+        $this->locked($key, function ($handle) use ($response, $ttlSeconds) {
             $record = $this->read($handle) ?? ['fingerprint' => ''];
             $this->write($handle, [
                 'status' => 'done',
