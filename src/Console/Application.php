@@ -10,7 +10,11 @@ use FloCMS\Api\Database\Connection;
 use FloCMS\Api\Database\SchemaInstaller;
 use FloCMS\Api\Idempotency\DatabaseIdempotencyStore;
 use FloCMS\Api\Idempotency\FileIdempotencyStore;
+use FloCMS\Api\OpenApi\OpenApiGenerator;
 use FloCMS\Api\RateLimit\FileRateLimiter;
+use FloCMS\Api\RouteLoader;
+use FloCMS\Api\Router;
+use FloCMS\Core\Support\Container;
 use FloCMS\Core\Env;
 use InvalidArgumentException;
 use PDO;
@@ -135,10 +139,11 @@ final class Application
 
     private function printHelp(): void
     {
-        $this->line('FloCMS API commands:');
-        $width = max(array_map(static fn (array $command): int => strlen($command[0]), $this->commands));
+        $this->line('FloCMS API commands (php flo <command>, or vendor/bin/flo-api <command>):');
         foreach ($this->commands as $command) {
-            $this->line('  ' . str_pad($command[0], $width + 2) . $command[1]);
+            $this->line();
+            $this->line('  ' . $command[0]);
+            $this->line('      ' . $command[1]);
         }
     }
 
@@ -247,6 +252,87 @@ final class Application
                 return 0;
             }
         );
+
+        $this->register(
+            'api:routes',
+            'api:routes [--routes=api/routes.php] [--prefix=/api]',
+            'List API routes with their names and middleware.',
+            function (array $args, array $options): int {
+                $rows = [];
+                foreach ($this->loadRouter($options)->routes() as $route) {
+                    $rows[] = [
+                        'method' => implode('|', $route->methods()),
+                        'path' => $route->pattern(),
+                        'name' => $route->name(),
+                        'middleware' => array_map([self::class, 'describeMiddleware'], $route->middlewareStack()),
+                    ];
+                }
+                $this->table($rows, ['method', 'path', 'name', 'middleware']);
+
+                return 0;
+            }
+        );
+
+        $this->register(
+            'api:docs',
+            'api:docs [--out=public/openapi.json] [--title=...] [--api-version=1.0.0] [--server=https://...] [--routes=api/routes.php] [--prefix=/api]',
+            'Generate an OpenAPI 3.1 document from the routes (stdout, or --out=file).',
+            function (array $args, array $options): int {
+                $json = (new OpenApiGenerator(
+                    $this->loadRouter($options),
+                    self::stringOption($options, 'title') ?? 'FloCMS API',
+                    self::stringOption($options, 'api-version') ?? '1.0.0',
+                    self::stringOption($options, 'server')
+                ))->toJson();
+
+                $out = self::stringOption($options, 'out');
+                if ($out === null) {
+                    fwrite($this->stdout, $json);
+
+                    return 0;
+                }
+                if (file_put_contents($this->path($out), $json) === false) {
+                    throw new RuntimeException('Unable to write ' . $out . '.');
+                }
+                $this->line('OpenAPI document written to ' . $out . '.');
+
+                return 0;
+            }
+        );
+    }
+
+    /**
+     * Load the application's routes the way public/api.php does.
+     *
+     * @param array<string, string|true> $options
+     */
+    public function loadRouter(array $options): Router
+    {
+        $file = $this->path(self::stringOption($options, 'routes') ?? 'api/routes.php');
+        $prefix = self::stringOption($options, 'prefix') ?? '/api';
+        if (!defined('ROOT')) {
+            define('ROOT', rtrim($this->projectRoot, '/\\'));
+        }
+        if (!defined('DS')) {
+            define('DS', DIRECTORY_SEPARATOR);
+        }
+
+        $router = new Router();
+        $router->group($prefix, static function (Router $router) use ($file): void {
+            (new RouteLoader($router, new Container()))->load($file);
+        });
+
+        return $router;
+    }
+
+    private static function describeMiddleware(mixed $middleware): string
+    {
+        return match (true) {
+            is_string($middleware) => $middleware,
+            $middleware instanceof Closure => 'closure',
+            is_object($middleware) => (new \ReflectionClass($middleware))->getShortName(),
+            default => get_debug_type($middleware),
+        };
     }
 
     /** Resolve a project-relative path. */
