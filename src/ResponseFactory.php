@@ -19,6 +19,9 @@ final class ResponseFactory
     /** Responses encoded with substituted invalid UTF-8 since the last take. */
     private static int $invalidUtf8 = 0;
 
+    /** Request ID to add to success bodies (Kernel::includeRequestIdInBody()). */
+    private static ?string $bodyRequestId = null;
+
     /** @param array<string, mixed> $meta */
     public static function success(
         mixed $data = null,
@@ -32,6 +35,9 @@ final class ResponseFactory
 
         if ($meta !== []) {
             $payload['meta'] = $meta;
+        }
+        if (self::$bodyRequestId !== null) {
+            $payload['request_id'] = self::$bodyRequestId;
         }
 
         return self::json($payload, $status);
@@ -86,7 +92,7 @@ final class ResponseFactory
         $lastPage = max(1, (int) ($pagination['last_page'] ?? $pagination['total_pages'] ?? 1));
         $link = static fn (int $target): string => Links::to($request, ['page' => $target]);
 
-        return self::json([
+        return self::json(self::withRequestId([
             'success' => true,
             'data' => self::mapRows($result['data'], $request, $map),
             'meta' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'last_page' => $lastPage],
@@ -96,7 +102,7 @@ final class ResponseFactory
                 'next' => $page < $lastPage ? $link($page + 1) : null,
                 'last' => $link($lastPage),
             ],
-        ], 200);
+        ]), 200);
     }
 
     /**
@@ -110,7 +116,7 @@ final class ResponseFactory
     {
         $next = $result['next_cursor'] ?? null;
 
-        return self::json([
+        return self::json(self::withRequestId([
             'success' => true,
             'data' => self::mapRows($result['data'] ?? [], $request, $map),
             'meta' => [
@@ -119,7 +125,7 @@ final class ResponseFactory
                 'has_more' => (bool) ($result['has_more'] ?? false),
             ],
             'links' => ['next' => $next !== null ? Links::to($request, ['cursor' => $next]) : null],
-        ], 200);
+        ]), 200);
     }
 
     /**
@@ -162,6 +168,29 @@ final class ResponseFactory
         }
 
         return $response->header('Last-Modified', gmdate('D, d M Y H:i:s', $timestamp) . ' GMT');
+    }
+
+    /**
+     * Set or clear the request ID added to success bodies.
+     *
+     * @internal called by the Kernel around each request
+     */
+    public static function setBodyRequestId(?string $requestId): void
+    {
+        self::$bodyRequestId = $requestId;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private static function withRequestId(array $payload): array
+    {
+        if (self::$bodyRequestId !== null) {
+            $payload['request_id'] = self::$bodyRequestId;
+        }
+
+        return $payload;
     }
 
     /**

@@ -34,6 +34,8 @@ final class Kernel implements RequestHandlerInterface
 
     private ?MiddlewareAliases $aliases = null;
 
+    private bool $requestIdInBody = false;
+
     public function __construct(
         private readonly Router $router,
         private readonly ContainerInterface $container = new Container(),
@@ -71,6 +73,17 @@ final class Kernel implements RequestHandlerInterface
         return $this;
     }
 
+    /**
+     * Also put the request ID in success bodies ("request_id"), as error
+     * bodies already have it. It is always in the X-Request-ID header.
+     */
+    public function includeRequestIdInBody(bool $enabled = true): self
+    {
+        $this->requestIdInBody = $enabled;
+
+        return $this;
+    }
+
     public function pipe(mixed $middleware): self
     {
         $this->middleware[] = $middleware;
@@ -83,6 +96,7 @@ final class Kernel implements RequestHandlerInterface
         $requestId = $this->requestId($request);
         $request = $request->withAttribute('request_id', $requestId);
         ResponseFactory::takeInvalidUtf8Count();
+        ResponseFactory::setBodyRequestId($this->requestIdInBody ? $requestId : null);
 
         $destination = new class($this) implements RequestHandlerInterface {
             public function __construct(private readonly Kernel $kernel)
@@ -109,6 +123,7 @@ final class Kernel implements RequestHandlerInterface
             $this->addMissingSecurityHeaders($response);
         }
 
+        ResponseFactory::setBodyRequestId(null);
         if (ResponseFactory::takeInvalidUtf8Count() > 0) {
             $this->logger?->warning('API response contained invalid UTF-8; replaced with U+FFFD.', [
                 'request_id' => $requestId,
