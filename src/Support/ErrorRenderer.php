@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace FloCMS\Api\Support;
 
 use FloCMS\Api\Exceptions\ApiException;
+use FloCMS\Api\Exceptions\DecoratedException;
 use FloCMS\Api\ResponseFactory;
 use FloCMS\Core\Http\Response;
 use FloCMS\Core\HttpException;
@@ -29,6 +30,17 @@ final class ErrorRenderer
 
     public function render(Throwable $error, string $requestId): Response
     {
+        if ($error instanceof DecoratedException) {
+            $response = $this->render($error->error, $requestId);
+            foreach ($error->headers as $name => $value) {
+                strcasecmp($name, 'Vary') === 0
+                    ? self::appendVary($response, $value)
+                    : $response->header($name, $value);
+            }
+
+            return $response;
+        }
+
         $requestId = $requestId !== '' ? $requestId : null;
 
         if ($error instanceof ApiException) {
@@ -72,6 +84,30 @@ final class ErrorRenderer
             ] : [],
             $requestId
         );
+    }
+
+    /** Whether render() can handle $error without logging or debug detail. */
+    public static function isClientError(Throwable $error): bool
+    {
+        return ($error instanceof ApiException && $error->status < 500)
+            || ($error instanceof HttpException && $error->status < 500);
+    }
+
+    /** Add $value to the Vary header unless it is already listed. */
+    public static function appendVary(Response $response, string $value): Response
+    {
+        foreach ($response->headers() as $name => $existing) {
+            if (strcasecmp($name, 'Vary') !== 0) {
+                continue;
+            }
+
+            $values = array_map('strtolower', array_map('trim', explode(',', $existing)));
+            if (in_array(strtolower($value), $values, true) || in_array('*', $values, true)) {
+                return $response;
+            }
+        }
+
+        return $response->appendHeader('Vary', $value);
     }
 
     public static function statusMessage(int $status): string

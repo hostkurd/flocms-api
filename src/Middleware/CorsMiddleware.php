@@ -5,9 +5,12 @@ namespace FloCMS\Api\Middleware;
 
 use FloCMS\Api\Contracts\MiddlewareInterface;
 use FloCMS\Api\Contracts\RequestHandlerInterface;
+use FloCMS\Api\Exceptions\DecoratedException;
+use FloCMS\Api\Support\ErrorRenderer;
 use FloCMS\Core\Http\Request;
 use FloCMS\Core\Http\Response;
 use InvalidArgumentException;
+use Throwable;
 
 final class CorsMiddleware implements MiddlewareInterface
 {
@@ -60,10 +63,36 @@ final class CorsMiddleware implements MiddlewareInterface
 
     public function process(Request $request, RequestHandlerInterface $handler): Response
     {
-        $response = $handler->handle($request);
+        try {
+            $response = $handler->handle($request);
+        } catch (Throwable $error) {
+            $headers = $this->corsHeaders($request);
+            if ($headers === []) {
+                throw $error;
+            }
+
+            // Client errors (404, 422, 429, ...) are rendered here so the
+            // browser can read them. Anything else goes to the outer handler,
+            // which logs it and adds these headers.
+            if (!ErrorRenderer::isClientError($error)) {
+                throw new DecoratedException($error, $headers);
+            }
+
+            $response = (new ErrorRenderer())->render(
+                $error,
+                (string) $request->attribute('request_id', '')
+            );
+        }
+
+        return $this->apply($response, $this->corsHeaders($request));
+    }
+
+    /** @return array<string, string> Headers for this request; empty without an Origin. */
+    private function corsHeaders(Request $request): array
+    {
         $origin = rtrim(trim((string) $request->header('Origin', '')), '/');
         if ($origin === '') {
-            return $response;
+            return [];
         }
 
         $allowOrigin = in_array('*', $this->allowedOrigins, true)
@@ -71,39 +100,35 @@ final class CorsMiddleware implements MiddlewareInterface
             : (in_array($origin, $this->allowedOrigins, true) ? $origin : null);
 
         if ($allowOrigin === null) {
-            return $this->varyOrigin($response);
+            return ['Vary' => 'Origin'];
         }
 
-        $response
-            ->header('Access-Control-Allow-Origin', $allowOrigin)
-            ->header('Access-Control-Allow-Methods', implode(', ', $this->allowedMethods))
-            ->header('Access-Control-Allow-Headers', implode(', ', $this->allowedHeaders))
-            ->header('Access-Control-Max-Age', (string) max(0, $this->maxAge));
-        $this->varyOrigin($response);
-
+        $headers = [
+            'Access-Control-Allow-Origin' => $allowOrigin,
+            'Access-Control-Allow-Methods' => implode(', ', $this->allowedMethods),
+            'Access-Control-Allow-Headers' => implode(', ', $this->allowedHeaders),
+            'Access-Control-Max-Age' => (string) max(0, $this->maxAge),
+            'Vary' => 'Origin',
+        ];
         if ($this->allowCredentials) {
-            $response->header('Access-Control-Allow-Credentials', 'true');
+            $headers['Access-Control-Allow-Credentials'] = 'true';
         }
         if ($this->exposedHeaders !== []) {
-            $response->header('Access-Control-Expose-Headers', implode(', ', $this->exposedHeaders));
+            $headers['Access-Control-Expose-Headers'] = implode(', ', $this->exposedHeaders);
+        }
+
+        return $headers;
+    }
+
+    /** @param array<string, string> $headers */
+    private function apply(Response $response, array $headers): Response
+    {
+        foreach ($headers as $name => $value) {
+            $name === 'Vary'
+                ? ErrorRenderer::appendVary($response, $value)
+                : $response->header($name, $value);
         }
 
         return $response;
-    }
-
-    private function varyOrigin(Response $response): Response
-    {
-        foreach ($response->headers() as $name => $value) {
-            if (strcasecmp($name, 'Vary') !== 0) {
-                continue;
-            }
-
-            $values = array_map('trim', explode(',', $value));
-            if (in_array('Origin', $values, true) || in_array('*', $values, true)) {
-                return $response;
-            }
-        }
-
-        return $response->appendHeader('Vary', 'Origin');
     }
 }
