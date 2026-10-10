@@ -228,6 +228,26 @@ final class Router
         }
     }
 
+    /**
+     * A group for one API version: prefix "/v1" and route names "v1.".
+     *
+     *     $router->version('v1', function (Router $router): void {
+     *         $router->get('/properties', ...)->name('properties.index'); // v1.properties.index
+     *     });
+     *
+     * @param callable(self): void $routes
+     * @param list<mixed> $middleware
+     */
+    public function version(string $version, callable $routes, array $middleware = []): void
+    {
+        if (!preg_match('/^v?[0-9]+(\.[0-9]+)?$/', $version)) {
+            throw new InvalidArgumentException('Invalid API version: ' . $version);
+        }
+        $version = 'v' . ltrim($version, 'v');
+
+        $this->group('/' . $version, $routes, $middleware, namePrefix: $version . '.');
+    }
+
     public function match(Request $request): RouteMatch
     {
         $path = self::normalizePath($request->path());

@@ -95,6 +95,10 @@ final class ErrorRenderer
     /** Whether render() can handle $error without logging or debug detail. */
     public static function isClientError(Throwable $error): bool
     {
+        if ($error instanceof DecoratedException) {
+            return self::isClientError($error->error);
+        }
+
         return ($error instanceof ApiException && $error->status < 500)
             || ($error instanceof HttpException && $error->status < 500)
             || $error instanceof CoreValidationException;
