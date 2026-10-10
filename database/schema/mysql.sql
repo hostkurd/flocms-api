@@ -32,3 +32,16 @@ CREATE TABLE IF NOT EXISTS api_tokens (
     PRIMARY KEY (id),
     KEY api_tokens_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Stored responses for Idempotency-Key (IdempotencyMiddleware with
+-- DatabaseIdempotencyStore). Rows expire after 24 hours; `flo api:gc --database` purges them.
+CREATE TABLE IF NOT EXISTS api_idempotency (
+    idempotency_key CHAR(64) NOT NULL,
+    fingerprint CHAR(64) NOT NULL,
+    status VARCHAR(10) NOT NULL,
+    response MEDIUMTEXT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (idempotency_key),
+    KEY api_idempotency_expires_at (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

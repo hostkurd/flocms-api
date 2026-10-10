@@ -8,6 +8,8 @@ use FloCMS\Api\Auth\ApiKeyRepository;
 use FloCMS\Api\Auth\TokenRepository;
 use FloCMS\Api\Database\Connection;
 use FloCMS\Api\Database\SchemaInstaller;
+use FloCMS\Api\Idempotency\DatabaseIdempotencyStore;
+use FloCMS\Api\Idempotency\FileIdempotencyStore;
 use FloCMS\Api\RateLimit\FileRateLimiter;
 use FloCMS\Core\Env;
 use InvalidArgumentException;
@@ -227,13 +229,20 @@ final class Application
 
         $this->register(
             'api:gc',
-            'api:gc [--rate-limit-dir=storage/cache/api-rate-limit] [--max-age=86400]',
-            'Delete stale rate-limit state. Safe to run from cron.',
+            'api:gc [--rate-limit-dir=storage/cache/api-rate-limit] [--idempotency-dir=storage/cache/api-idempotency] [--max-age=86400] [--database]',
+            'Delete stale rate-limit and idempotency state (--database: also the api_idempotency table). Safe to run from cron.',
             function (array $args, array $options): int {
                 $directory = $this->path(self::stringOption($options, 'rate-limit-dir') ?? 'storage/cache/api-rate-limit');
                 $maxAge = self::intOption($options, 'max-age') ?? 86400;
                 $removed = (new FileRateLimiter($directory, 0))->gc($maxAge);
                 $this->line('Rate limits: ' . $removed . ' stale file(s) removed from ' . $directory . '.');
+
+                $idempotency = $this->path(self::stringOption($options, 'idempotency-dir') ?? 'storage/cache/api-idempotency');
+                $this->line('Idempotency: ' . (new FileIdempotencyStore($idempotency))->purge() . ' expired file(s) removed from ' . $idempotency . '.');
+
+                if (isset($options['database'])) {
+                    $this->line('Idempotency: ' . (new DatabaseIdempotencyStore($this->connection()))->purge() . ' expired row(s) removed from api_idempotency.');
+                }
 
                 return 0;
             }

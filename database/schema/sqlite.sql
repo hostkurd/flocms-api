@@ -26,3 +26,13 @@ CREATE TABLE IF NOT EXISTS api_tokens (
     created_at DATETIME NOT NULL
 );
 CREATE INDEX IF NOT EXISTS api_tokens_user_id ON api_tokens (user_id);
+
+CREATE TABLE IF NOT EXISTS api_idempotency (
+    idempotency_key CHAR(64) NOT NULL PRIMARY KEY,
+    fingerprint CHAR(64) NOT NULL,
+    status VARCHAR(10) NOT NULL,
+    response TEXT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME NOT NULL
+);
+CREATE INDEX IF NOT EXISTS api_idempotency_expires_at ON api_idempotency (expires_at);
