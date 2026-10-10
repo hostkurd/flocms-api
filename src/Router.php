@@ -59,6 +59,55 @@ final class Router
         return $this->warnings;
     }
 
+    /**
+     * The path of a named route:
+     *
+     *     $router->url('properties.show', ['slug' => 'sea-villa'], ['page' => 2]);
+     *     // "/api/v1/properties/sea-villa?page=2"
+     *
+     * Parameters are checked against the route's constraints and URL-encoded.
+     * The path includes group prefixes and is relative to the host.
+     *
+     * @param array<string, string|int|float> $params
+     * @param array<string, mixed> $query
+     * @throws InvalidArgumentException for an unknown name or missing, unknown or invalid parameters
+     */
+    public function url(string $name, array $params = [], array $query = []): string
+    {
+        $route = $this->named[$name] ?? throw new InvalidArgumentException('Unknown route name: ' . $name);
+
+        $path = '';
+        $used = [];
+        foreach ($route->segments() as $segment) {
+            if ($segment[0] === 'static') {
+                $path .= '/' . $segment[1];
+                continue;
+            }
+
+            $param = $segment[1];
+            if (!array_key_exists($param, $params) || !is_scalar($params[$param]) || is_bool($params[$param])) {
+                throw new InvalidArgumentException('Route "' . $name . '" needs parameter "' . $param . '".');
+            }
+            // Requests are matched before decoding, so check the encoded form.
+            $value = rawurlencode((string) $params[$param]);
+            $constraint = $segment[2] ?? '[^/]+';
+            if ($value === '' || preg_match('~^(?:' . str_replace('~', '\~', $constraint) . ')$~D', $value) !== 1) {
+                throw new InvalidArgumentException('Parameter "' . $param . '" of route "' . $name . '" does not match ' . $constraint . '.');
+            }
+            $path .= '/' . $value;
+            $used[] = $param;
+        }
+
+        $unknown = array_diff(array_keys($params), $used);
+        if ($unknown !== []) {
+            throw new InvalidArgumentException('Route "' . $name . '" has no parameter(s): ' . implode(', ', $unknown) . '.');
+        }
+
+        $queryString = http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+
+        return ($path === '' ? '/' : $path) . ($queryString !== '' ? '?' . $queryString : '');
+    }
+
     /** The route registered under $name, or null. */
     public function named(string $name): ?Route
     {
