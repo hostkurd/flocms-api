@@ -7,6 +7,7 @@ use Closure;
 use FloCMS\Api\Contracts\RequestHandlerInterface;
 use FloCMS\Api\Exceptions\ApiException;
 use FloCMS\Api\Middleware\ExceptionMiddleware;
+use FloCMS\Api\Middleware\MiddlewareAliases;
 use FloCMS\Api\Middleware\Pipeline;
 use FloCMS\Api\Middleware\SecurityHeadersMiddleware;
 use FloCMS\Api\Support\ErrorRenderer;
@@ -29,6 +30,8 @@ final class Kernel implements RequestHandlerInterface
     /** @var list<mixed> */
     private array $middleware = [];
 
+    private ?MiddlewareAliases $aliases = null;
+
     public function __construct(
         private readonly Router $router,
         private readonly ContainerInterface $container = new Container(),
@@ -43,6 +46,25 @@ final class Kernel implements RequestHandlerInterface
     public function middleware(array $middleware): self
     {
         $this->middleware = $middleware;
+
+        return $this;
+    }
+
+    /**
+     * Register middleware aliases such as 'throttle' for 'throttle:forms'.
+     *
+     * @param MiddlewareAliases|array<string, callable> $aliases
+     */
+    public function aliases(MiddlewareAliases|array $aliases): self
+    {
+        if (is_array($aliases)) {
+            $registry = $this->aliases ?? new MiddlewareAliases();
+            foreach ($aliases as $name => $factory) {
+                $registry->register($name, $factory);
+            }
+            $aliases = $registry;
+        }
+        $this->aliases = $aliases;
 
         return $this;
     }
@@ -75,7 +97,8 @@ final class Kernel implements RequestHandlerInterface
             $response = (new Pipeline(
                 $this->middleware,
                 $destination,
-                $this->container
+                $this->container,
+                $this->aliases
             ))->handle($request);
         } catch (Throwable $error) {
             // Reached when the middleware list has no ExceptionMiddleware, or
@@ -141,7 +164,8 @@ final class Kernel implements RequestHandlerInterface
         $response = (new Pipeline(
             $route->middlewareStack(),
             $destination,
-            $this->container
+            $this->container,
+            $this->aliases
         ))->handle($request);
 
         return $request->method() === 'HEAD' ? $response->withoutBody() : $response;
