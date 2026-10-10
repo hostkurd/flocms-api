@@ -26,6 +26,9 @@
       "FloCMS\\Api\\Tests\\": "tests/"
     }
   },
+  "bin": [
+    "bin/flo-api"
+  ],
   "scripts": {
     "test": "phpunit",
     "test:unit": "phpunit --testsuite unit"

@@ -8,5 +8,9 @@
         <testsuite name="unit">
             <directory>tests/Unit</directory>
         </testsuite>
+        <!-- SQLite always; MySQL/MariaDB too when FLO_TEST_MYSQL_HOST is set -->
+        <testsuite name="integration">
+            <directory>tests/Integration</directory>
+        </testsuite>
     </testsuites>
 </phpunit>
