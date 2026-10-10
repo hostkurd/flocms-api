@@ -10,6 +10,8 @@ use FloCMS\Api\Middleware\ExceptionMiddleware;
 use FloCMS\Api\Middleware\MiddlewareAliases;
 use FloCMS\Api\Middleware\Pipeline;
 use FloCMS\Api\Middleware\SecurityHeadersMiddleware;
+use FloCMS\Api\Resources\JsonResource;
+use FloCMS\Api\Resources\Resolvable;
 use FloCMS\Api\Support\ErrorRenderer;
 use FloCMS\Core\Http\Request;
 use FloCMS\Core\Http\Response;
@@ -177,7 +179,7 @@ final class Kernel implements RequestHandlerInterface
         $arguments = $this->resolveArguments($reflection, $request);
         $result = $callable(...$arguments);
 
-        return $this->normalizeResponse($result);
+        return $this->normalizeResponse($result, $request);
     }
 
     /** @return array{0: callable, 1: ReflectionFunctionAbstract} */
@@ -286,10 +288,15 @@ final class Kernel implements RequestHandlerInterface
         };
     }
 
-    private function normalizeResponse(mixed $result): Response
+    private function normalizeResponse(mixed $result, Request $request): Response
     {
         if ($result instanceof Response) {
             return $result;
+        }
+        if ($result instanceof Resolvable) {
+            JsonResource::assertIncludes($request, $result->allowedIncludes());
+
+            return ResponseFactory::success($result->resolve($request), 200, $result->meta($request));
         }
         if ($result === null) {
             return Response::noContent();
