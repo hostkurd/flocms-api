@@ -45,6 +45,28 @@ final class SecurityHeadersTest extends TestCase
         self::assertSame('nosniff', $response->headers()['X-Content-Type-Options'] ?? null);
     }
 
+    public function testNoStoreIsTheDefaultCachePolicy(): void
+    {
+        $router = new Router();
+        $router->get('/v1/me', static fn (): array => ['id' => 1]);
+        $kernel = (new Kernel($router))->middleware([new SecurityHeadersMiddleware()]);
+
+        self::assertSame('no-store', $kernel->handle($this->request('GET', '/v1/me'))->headers()['Cache-Control']);
+    }
+
+    public function testRouteCachePolicyIsKept(): void
+    {
+        $router = new Router();
+        $router->get('/v1/pages', static fn () => Response::json([])->header('cache-control', 'public, max-age=300'));
+        $kernel = (new Kernel($router))->middleware([new SecurityHeadersMiddleware()]);
+
+        $headers = $kernel->handle($this->request('GET', '/v1/pages'))->headers();
+
+        self::assertSame('public, max-age=300', $headers['cache-control']);
+        self::assertArrayNotHasKey('Cache-Control', $headers);
+        self::assertSame('nosniff', $headers['X-Content-Type-Options']);
+    }
+
     public function testFallbackKeepsHeadersAlreadySet(): void
     {
         $router = new Router();
