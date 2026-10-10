@@ -14,7 +14,7 @@ final class RoutePatternTest extends TestCase
 {
     public function testParameterWithoutConstraintMatchesOneSegment(): void
     {
-        $route = new Route(['GET'], '/v1/properties/{slug}', static fn (): null => null);
+        $route = new Route(['GET'], '/v1/properties/{slug}', static fn () => null);
 
         self::assertSame(['slug' => 'sea-villa'], $route->matchPath('/v1/properties/sea-villa'));
         self::assertSame(['slug' => 'a b'], $route->matchPath('/v1/properties/a%20b'));
@@ -24,7 +24,7 @@ final class RoutePatternTest extends TestCase
 
     public function testParameterWithConstraint(): void
     {
-        $route = new Route(['GET'], '/v1/widgets/{id:\d+}', static fn (): null => null);
+        $route = new Route(['GET'], '/v1/widgets/{id:\d+}', static fn () => null);
 
         self::assertSame(['id' => '42'], $route->matchPath('/v1/widgets/42'));
         self::assertNull($route->matchPath('/v1/widgets/abc'));
@@ -32,7 +32,7 @@ final class RoutePatternTest extends TestCase
 
     public function testSeveralUnconstrainedParameters(): void
     {
-        $route = new Route(['GET'], '/v1/{a}/{b}', static fn (): null => null);
+        $route = new Route(['GET'], '/v1/{a}/{b}', static fn () => null);
 
         self::assertSame(['a' => 'x', 'b' => 'y'], $route->matchPath('/v1/x/y'));
         self::assertNull($route->matchPath('/v1/x'));
@@ -42,14 +42,14 @@ final class RoutePatternTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
 
-        new Route(['GET'], '/v1/files/{path:.+/.+}', static fn (): null => null);
+        new Route(['GET'], '/v1/files/{path:.+/.+}', static fn () => null);
     }
 
     public function testEmptyConstraintIsRejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
 
-        new Route(['GET'], '/v1/files/{path:}', static fn (): null => null);
+        new Route(['GET'], '/v1/files/{path:}', static fn () => null);
     }
 
     public function testApiWithUnconstrainedRouteStillServesOtherRoutes(): void
