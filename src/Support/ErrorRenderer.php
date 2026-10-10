@@ -8,6 +8,7 @@ use FloCMS\Api\Exceptions\DecoratedException;
 use FloCMS\Api\ResponseFactory;
 use FloCMS\Core\Http\Response;
 use FloCMS\Core\HttpException;
+use FloCMS\Core\ValidationException as CoreValidationException;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
@@ -57,6 +58,11 @@ final class ErrorRenderer
             return $response;
         }
 
+        // Thrown by core Validator::validate(); its errors are field => list<string>.
+        if ($error instanceof CoreValidationException) {
+            return ResponseFactory::error('Validation failed.', 422, $error->getErrors(), $requestId);
+        }
+
         if ($error instanceof HttpException) {
             $message = trim($error->getMessage());
             if ($message === '' || preg_match('/^HTTP\s+\d{3}$/', $message)) {
@@ -90,7 +96,8 @@ final class ErrorRenderer
     public static function isClientError(Throwable $error): bool
     {
         return ($error instanceof ApiException && $error->status < 500)
-            || ($error instanceof HttpException && $error->status < 500);
+            || ($error instanceof HttpException && $error->status < 500)
+            || $error instanceof CoreValidationException;
     }
 
     /** Add $value to the Vary header unless it is already listed. */
