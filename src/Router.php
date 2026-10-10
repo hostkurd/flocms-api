@@ -7,6 +7,7 @@ use FloCMS\Api\Exceptions\ApiException;
 use FloCMS\Api\Exceptions\MethodNotAllowedException;
 use FloCMS\Core\Http\Request;
 use InvalidArgumentException;
+use Psr\Log\LoggerInterface;
 
 final class Router
 {
@@ -17,6 +18,52 @@ final class Router
      * @var list<array{prefix: string, middleware: list<mixed>, module: ?string, name: string}>
      */
     private array $groups = [];
+
+    /** @var array<string, Route> */
+    private array $named = [];
+
+    /** @var list<string> */
+    private array $warnings = [];
+
+    /**
+     * @param bool $strict throw on shadowed routes and duplicate route names
+     *        instead of logging a warning (recommended in development)
+     */
+    public function __construct(
+        private ?LoggerInterface $logger = null,
+        private bool $strict = false
+    ) {
+    }
+
+    /**
+     * Throw InvalidArgumentException on shadowed routes and duplicate names.
+     * Without strict mode they are logged as warnings and listed by warnings().
+     */
+    public function strict(bool $strict = true): self
+    {
+        $this->strict = $strict;
+
+        return $this;
+    }
+
+    public function setLogger(?LoggerInterface $logger): self
+    {
+        $this->logger = $logger;
+
+        return $this;
+    }
+
+    /** @return list<string> Registration problems found outside strict mode. */
+    public function warnings(): array
+    {
+        return $this->warnings;
+    }
+
+    /** The route registered under $name, or null. */
+    public function named(string $name): ?Route
+    {
+        return $this->named[$name] ?? null;
+    }
 
     public function get(string $path, mixed $handler): Route
     {
@@ -79,8 +126,28 @@ final class Router
                     'Duplicate route for ' . implode('|', $route->methods()) . ' ' . $pattern
                 );
             }
+            if (
+                array_intersect($existing->methods(), $route->methods()) !== []
+                && self::covers($existing, $route)
+            ) {
+                $this->report(
+                    'Route ' . implode('|', $route->methods()) . ' ' . $pattern
+                    . ' can never match: ' . $existing->pattern()
+                    . ' is registered first and matches the same paths.'
+                );
+            }
         }
 
+        $route->onName(function (Route $named, string $name): void {
+            $existing = $this->named[$name] ?? null;
+            if ($existing !== null && $existing !== $named) {
+                $this->report('Duplicate route name "' . $name . '" (' . $existing->pattern()
+                    . ' and ' . $named->pattern() . ').');
+
+                return;
+            }
+            $this->named[$name] = $named;
+        });
         $this->routes[] = $route;
 
         return $route;
@@ -199,6 +266,46 @@ final class Router
     public function routes(): array
     {
         return $this->routes;
+    }
+
+    /**
+     * Whether every path $later matches is already matched by $earlier.
+     * Routes match first-registered first, so $later would be unreachable.
+     */
+    private static function covers(Route $earlier, Route $later): bool
+    {
+        $a = $earlier->segments();
+        $b = $later->segments();
+        if (count($a) !== count($b)) {
+            return false;
+        }
+
+        foreach ($a as $index => $segment) {
+            $other = $b[$index];
+            if ($segment[0] === 'param' && $segment[2] === null) {
+                continue; // an unconstrained parameter matches any one segment
+            }
+            if ($segment[0] === 'static' && $other[0] === 'static' && $segment[1] === $other[1]) {
+                continue;
+            }
+            if ($segment[0] === 'param' && $other[0] === 'param' && $segment[2] === $other[2]) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function report(string $message): void
+    {
+        if ($this->strict) {
+            throw new InvalidArgumentException($message);
+        }
+
+        $this->warnings[] = $message;
+        $this->logger?->warning('API route registration: ' . $message);
     }
 
     public static function normalizePath(string $path): string
