@@ -1,5 +1,54 @@
 # Changelog
 
+## 1.1.0 - unreleased
+
+New features are opt-in and backward compatible. See UPGRADE.md.
+
+### Hardening
+- `SecurityHeadersMiddleware` sends `Cache-Control: no-store` only when the
+  response has no Cache-Control yet (B1).
+- CORS: preflights validate the requested method and headers and echo only
+  allowed headers. Allow-Methods/Allow-Headers/Max-Age are sent on
+  preflights only. Origin patterns (`https://*.example.com`) are supported.
+  `X-RateLimit-Reset` and `Retry-After` are exposed by default (B2).
+- `BodySizeMiddleware` (413 for any content type) and
+  `RequireJsonMiddleware` (415) (B3).
+- Named rate limits (`RateLimiterRegistry`, `'throttle:forms'`), keyed by
+  identity when authenticated. Middleware aliases (`Kernel::aliases()`).
+  `FileRateLimiter::gc()` with automatic cleanup. Optional `ApcuRateLimiter` (B4).
+- The router reports shadowed routes and duplicate route names (warnings, or
+  exceptions in strict mode) (B5).
+- `AccessLogMiddleware` (B6).
+
+### Features
+- Authentication: `ApiKeyAuthenticator`, `BearerTokenAuthenticator`
+  (personal access tokens), `SessionAuthenticator` (FloCMS admin session +
+  CSRF), `JwtAuthenticator` (HS256), `FirstMatchAuthenticator`; schema files
+  and `flo api:*` commands; `Identity::can()` with the core permission map;
+  `AuthenticateMiddleware` permissions (C1).
+- Request validation: `Validation\Validator` with the core rules plus
+  email, url, bool, array, date, between, regex, nullable, sometimes, exists,
+  unique; `ValidatesRequests` trait with `validate()` / `validateQuery()` (C2).
+- `JsonResource` and `ResourceCollection`, with `?include=` (C3).
+- `ResponseFactory::paginated()`, `PageRequest`, cursor pagination (C4).
+- `CacheControl` and `ETagMiddleware` (304), `ResponseFactory::withLastModified()` (C5).
+- `LocaleMiddleware` (C6).
+- `Router::url()` (C7).
+- `QueryOptions`: whitelisted sorting, filtering and sparse fieldsets (C8).
+- `Uploads\HandlesUploads` for flocms-uploader, including chunked uploads (C9).
+- `Router::version()` and the `Deprecated` middleware (C10).
+- `HealthController` and `MaintenanceMiddleware` (C11).
+- `IdempotencyMiddleware` with file and database stores (C12).
+- OpenAPI 3.1 generation with handler attributes, `OpenApiController`,
+  `flo api:docs` and `flo api:routes` (C13).
+- `Kernel::includeRequestIdInBody()` (A7).
+- `Testing\TestClient`, `TestResponse` and `StaticAuthenticator` (D1).
+- `vendor/bin/flo-api` command line; the FloCMS skeleton forwards `php flo api:*` to it.
+
+### Other
+- 326 tests (5 in 1.0.0), CI on PHP 8.1 to 8.4 plus MariaDB 10.11 and MySQL 8.0.
+- README rewritten as a full guide.
+
 ## 1.0.1 - 2026-10-10
 
 Bug fixes only. No API changes.
