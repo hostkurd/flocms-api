@@ -38,17 +38,22 @@ The FloCMS skeleton (1.6+) ships with the API wired up in `public/api.php`.
 For another project:
 
 ```bash
-composer require hostkurd/flocms-api:1.1.0
+composer require hostkurd/flocms-api:1.2.0
 ```
+
+1.2 requires [flocms-cli](https://github.com/hostkurd/flocms-cli) 2.0, which
+runs the `php flo api:*` commands.
 
 The database features (API keys, tokens, database idempotency store) need
-their tables:
+their tables. They are a migration, so they are created with the
+application's own migrations:
 
 ```bash
-php flo api:install-schema
+php flo migrate               # every pending migration, the API's included
+php flo api:install-schema    # or only the API's
 ```
 
-or import `vendor/hostkurd/flocms-api/database/schema/mysql.sql` in
+You can also import `vendor/hostkurd/flocms-api/database/schema/mysql.sql` in
 phpMyAdmin.
 
 ## Setup
@@ -589,12 +594,16 @@ final class PropertiesController extends Controller
 
 ## Command line
 
-Run through the FloCMS skeleton's `php flo`, or `vendor/bin/flo-api` from the
-project root. The database settings come from `.env`.
+The API commands are [flocms-cli](https://github.com/hostkurd/flocms-cli)
+commands. flocms-api registers them in its composer.json
+(`"extra": {"flocms": {"commands": [...]}}`), so `php flo` finds them on any
+FloCMS site, whatever the age of its root `flo` file. List them with
+`php flo list api`. The database settings come from `.env`, or from
+`FLO_API_DSN` (plus `FLO_API_DB_USER` / `FLO_API_DB_PASS`) when set.
 
 | Command | |
 |---|---|
-| `api:install-schema` | create the API tables |
+| `api:install-schema` | run the API's migrations (create the API tables) |
 | `api:key:create <name> [--scopes=a,b] [--user=ID] [--expires=YYYY-MM-DD]` | create an API key (shown once) |
 | `api:key:list`, `api:key:revoke <id>` | |
 | `api:token:create <user-id> <name> [--scopes=] [--expires=]` | issue a personal access token |
@@ -602,6 +611,18 @@ project root. The database settings come from `.env`.
 | `api:routes` | list routes, names and middleware |
 | `api:docs [--out=file]` | generate the OpenAPI document |
 | `api:gc [--database]` | delete stale rate-limit and idempotency state (cron-safe) |
+| `api:list` | the API commands |
+
+Some flocms-cli commands include the API automatically:
+
+- `php flo route:list` shows the routes of `api/routes.php` next to the
+  controller routes.
+- `php flo migrate` creates the API tables.
+- `php flo schedule:run` runs `api:gc` daily.
+
+`vendor/bin/flo-api <command>` still runs the API commands on their own.
+`FloCMS\Api\Console\Application` remains as a deprecated wrapper with the
+1.1 behavior.
 
 ## Testing your API
 
