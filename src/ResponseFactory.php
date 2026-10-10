@@ -3,7 +3,11 @@ declare(strict_types=1);
 
 namespace FloCMS\Api;
 
+use FloCMS\Api\Pagination\Links;
+use FloCMS\Api\Resources\JsonResource;
+use FloCMS\Core\Http\Request;
 use FloCMS\Core\Http\Response;
+use InvalidArgumentException;
 use JsonException;
 use RuntimeException;
 
@@ -52,6 +56,92 @@ final class ResponseFactory
         }
 
         return self::json($payload, $status);
+    }
+
+    /**
+     * A page of core Database::paginate() (or Model) results:
+     *
+     *     {"success": true, "data": [...],
+     *      "meta": {"page": 2, "per_page": 20, "total": 95, "last_page": 5},
+     *      "links": {"first": "...?page=1", "prev": "...?page=1", "next": "...?page=3", "last": "...?page=5"}}
+     *
+     * Links keep the current query string (filters, sort, per_page) and are
+     * relative to the host. $map shapes each row: a JsonResource class, a
+     * callable, or null for the rows as they are.
+     *
+     * @param array{data: iterable<mixed>, pagination: array<string, mixed>} $result
+     * @param class-string<JsonResource>|callable|null $map
+     */
+    public static function paginated(array $result, Request $request, string|callable|null $map = null): Response
+    {
+        $pagination = $result['pagination'] ?? null;
+        if (!is_array($pagination) || !array_key_exists('data', $result)) {
+            throw new InvalidArgumentException('Expected the array returned by Database::paginate().');
+        }
+
+        $page = max(1, (int) ($pagination['cur_page'] ?? 1));
+        $perPage = max(1, (int) ($pagination['per_page'] ?? 1));
+        $total = max(0, (int) ($pagination['items_count'] ?? 0));
+        $lastPage = max(1, (int) ($pagination['last_page'] ?? $pagination['total_pages'] ?? 1));
+        $link = static fn (int $target): string => Links::to($request, ['page' => $target]);
+
+        return self::json([
+            'success' => true,
+            'data' => self::mapRows($result['data'], $request, $map),
+            'meta' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'last_page' => $lastPage],
+            'links' => [
+                'first' => $link(1),
+                'prev' => $page > 1 ? $link(min($page - 1, $lastPage)) : null,
+                'next' => $page < $lastPage ? $link($page + 1) : null,
+                'last' => $link($lastPage),
+            ],
+        ], 200);
+    }
+
+    /**
+     * A page from Pagination\CursorPaginator::paginate():
+     * {"data": [...], "meta": {"per_page", "next_cursor", "has_more"}, "links": {"next"}}.
+     *
+     * @param array{data: iterable<mixed>, per_page: int, next_cursor: ?string, has_more: bool} $result
+     * @param class-string<JsonResource>|callable|null $map
+     */
+    public static function cursorPaginated(array $result, Request $request, string|callable|null $map = null): Response
+    {
+        $next = $result['next_cursor'] ?? null;
+
+        return self::json([
+            'success' => true,
+            'data' => self::mapRows($result['data'] ?? [], $request, $map),
+            'meta' => [
+                'per_page' => (int) ($result['per_page'] ?? 0),
+                'next_cursor' => $next,
+                'has_more' => (bool) ($result['has_more'] ?? false),
+            ],
+            'links' => ['next' => $next !== null ? Links::to($request, ['cursor' => $next]) : null],
+        ], 200);
+    }
+
+    /**
+     * @param iterable<mixed> $rows
+     * @param class-string<JsonResource>|callable|null $map
+     * @return list<mixed>
+     */
+    private static function mapRows(iterable $rows, Request $request, string|callable|null $map): array
+    {
+        $rows = is_array($rows) ? array_values($rows) : iterator_to_array($rows, false);
+        if ($map === null) {
+            return $rows;
+        }
+        if (is_string($map) && is_subclass_of($map, JsonResource::class)) {
+            JsonResource::assertIncludes($request, $map::collection([])->allowedIncludes());
+
+            return $map::collection($rows)->resolve($request);
+        }
+        if (!is_callable($map)) {
+            throw new InvalidArgumentException('$map must be a JsonResource class or a callable.');
+        }
+
+        return array_map(static fn (mixed $row): mixed => JsonResource::resolveValue($map($row), $request), $rows);
     }
 
     /**
