@@ -10,13 +10,22 @@ use FloCMS\Core\Http\Response;
 
 final class SecurityHeadersMiddleware implements MiddlewareInterface
 {
+    /** @internal */
+    public const HEADERS = [
+        'X-Content-Type-Options' => 'nosniff',
+        'X-Frame-Options' => 'DENY',
+        'Referrer-Policy' => 'no-referrer',
+        'Permissions-Policy' => 'camera=(), microphone=(), geolocation=()',
+        'Cache-Control' => 'no-store',
+    ];
+
     public function process(Request $request, RequestHandlerInterface $handler): Response
     {
-        return $handler->handle($request)
-            ->header('X-Content-Type-Options', 'nosniff')
-            ->header('X-Frame-Options', 'DENY')
-            ->header('Referrer-Policy', 'no-referrer')
-            ->header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
-            ->header('Cache-Control', 'no-store');
+        $response = $handler->handle($request);
+        foreach (self::HEADERS as $name => $value) {
+            $response->header($name, $value);
+        }
+
+        return $response;
     }
 }
