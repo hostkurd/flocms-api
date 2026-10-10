@@ -68,71 +68,16 @@ final class ClientIpResolver
 
     private function isTrusted(string $ip): bool
     {
-        foreach ($this->trustedProxies as $proxy) {
-            if ($this->matchesCidr($ip, trim($proxy))) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function matchesCidr(string $ip, string $cidr): bool
-    {
-        if (!str_contains($cidr, '/')) {
-            return hash_equals($cidr, $ip);
-        }
-
-        [$network, $prefix] = explode('/', $cidr, 2);
-        $ipBinary = inet_pton($ip);
-        $networkBinary = inet_pton($network);
-        if ($ipBinary === false || $networkBinary === false || strlen($ipBinary) !== strlen($networkBinary)) {
-            return false;
-        }
-
-        $bits = (int) $prefix;
-        $maxBits = strlen($ipBinary) * 8;
-        if ($bits < 0 || $bits > $maxBits) {
-            return false;
-        }
-
-        $bytes = intdiv($bits, 8);
-        $remainder = $bits % 8;
-        if ($bytes > 0 && substr($ipBinary, 0, $bytes) !== substr($networkBinary, 0, $bytes)) {
-            return false;
-        }
-        if ($remainder === 0) {
-            return true;
-        }
-
-        $mask = (0xFF << (8 - $remainder)) & 0xFF;
-
-        return (ord($ipBinary[$bytes]) & $mask) === (ord($networkBinary[$bytes]) & $mask);
+        return IpMatcher::matchesAny($ip, $this->trustedProxies);
     }
 
     private function validIp(string $ip): bool
     {
-        return $ip !== '' && filter_var($ip, FILTER_VALIDATE_IP) !== false;
+        return IpMatcher::isValidIp($ip);
     }
 
     private function validProxy(string $proxy): bool
     {
-        if (!str_contains($proxy, '/')) {
-            return $this->validIp($proxy);
-        }
-
-        [$network, $prefix] = explode('/', $proxy, 2);
-        if (!$this->validIp($network) || !ctype_digit($prefix)) {
-            return false;
-        }
-
-        $binary = inet_pton($network);
-        if ($binary === false) {
-            return false;
-        }
-
-        $bits = (int) $prefix;
-
-        return $bits >= 0 && $bits <= strlen($binary) * 8;
+        return IpMatcher::isValidRange($proxy);
     }
 }
