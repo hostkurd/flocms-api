@@ -10,14 +10,22 @@ permissions:
 
 jobs:
   phpunit:
-    name: PHP ${{ matrix.php }}
-    runs-on: ubuntu-latest
+    name: PHP ${{ matrix.php }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         php: ['8.1', '8.2', '8.3', '8.4']
+        include:
+          # XAMPP users run FloCMS on Windows
+          - { os: windows-latest, php: '8.1' }
+          - { os: windows-latest, php: '8.4' }
 
     steps:
+      - name: Keep LF line endings on Windows
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@v4
 
       # The extensions FloCMS requires on shared hosting, plus pdo_sqlite for
@@ -32,11 +40,26 @@ jobs:
       - name: Validate composer.json
         run: composer validate --strict --no-check-lock
 
+      # Until hostkurd/flocms-cli 2.0.0 is on Packagist, use its release branch
+      - name: Use the unreleased flocms-cli 2.0
+        shell: bash
+        run: |
+          if ! composer show --all --no-interaction hostkurd/flocms-cli 2.0.0 > /dev/null 2>&1; then
+            composer config repositories.flocms-cli vcs https://github.com/hostkurd/flocms-cli
+            composer require --no-update --no-interaction "hostkurd/flocms-cli:dev-release/2.0.0 as 2.0.0"
+          fi
+
       - name: Install dependencies
-        run: composer update --no-interaction --no-progress --prefer-dist
+        run: |
+          composer update --no-interaction --no-progress --prefer-dist
+          # The tests check the requirements in composer.json
+          git checkout -- composer.json
 
       - name: Lint
-        run: find src tests bin -name '*.php' -o -name 'flo-api' | xargs -n1 php -l > /dev/null
+        shell: bash
+        run: |
+          php -l bin/flo-api > /dev/null
+          find src tests database -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
 
       - name: Run tests (MySQL tests are skipped here)
         run: vendor/bin/phpunit
@@ -74,8 +97,18 @@ jobs:
           coverage: none
           tools: composer:v2
 
+      - name: Use the unreleased flocms-cli 2.0
+        run: |
+          if ! composer show --all --no-interaction hostkurd/flocms-cli 2.0.0 > /dev/null 2>&1; then
+            composer config repositories.flocms-cli vcs https://github.com/hostkurd/flocms-cli
+            composer require --no-update --no-interaction "hostkurd/flocms-cli:dev-release/2.0.0 as 2.0.0"
+          fi
+
       - name: Install dependencies
-        run: composer update --no-interaction --no-progress --prefer-dist
+        run: |
+          composer update --no-interaction --no-progress --prefer-dist
+          # The tests check the requirements in composer.json
+          git checkout -- composer.json
 
       - name: Run integration tests against ${{ matrix.db.name }}
         env:
