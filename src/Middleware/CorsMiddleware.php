@@ -63,6 +63,12 @@ final class CorsMiddleware implements MiddlewareInterface
 
     public function process(Request $request, RequestHandlerInterface $handler): Response
     {
+        // Answer preflights here: they carry no credentials, so they should not
+        // reach rate limiting, authentication or the route handler.
+        if ($this->isPreflight($request)) {
+            return $this->apply(Response::noContent(), $this->corsHeaders($request));
+        }
+
         try {
             $response = $handler->handle($request);
         } catch (Throwable $error) {
@@ -85,6 +91,13 @@ final class CorsMiddleware implements MiddlewareInterface
         }
 
         return $this->apply($response, $this->corsHeaders($request));
+    }
+
+    private function isPreflight(Request $request): bool
+    {
+        return $request->method() === 'OPTIONS'
+            && trim((string) $request->header('Origin', '')) !== ''
+            && trim((string) $request->header('Access-Control-Request-Method', '')) !== '';
     }
 
     /** @return array<string, string> Headers for this request; empty without an Origin. */
