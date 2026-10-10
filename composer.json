@@ -59,6 +59,9 @@
         "FloCMS\\Api\\Console\\Commands\\RoutesCommand",
         "FloCMS\\Api\\Console\\Commands\\DocsCommand"
       ],
+      "migrations": [
+        "database/migrations"
+      ],
       "route-providers": [
         "FloCMS\\Api\\Console\\Commands\\ApiRoutes"
       ]

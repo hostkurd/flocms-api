@@ -34,6 +34,11 @@ final class CliKernelTest extends TestCase
             };
             PHP);
         $composer = json_decode((string) file_get_contents(dirname(__DIR__, 2) . '/composer.json'), true);
+        // The package as Composer installs it: its migrations under vendor/
+        mkdir($this->root . '/vendor/hostkurd/flocms-api/database/migrations', 0777, true);
+        foreach (glob(dirname(__DIR__, 2) . '/database/migrations/*.php') ?: [] as $migration) {
+            copy($migration, $this->root . '/vendor/hostkurd/flocms-api/database/migrations/' . basename($migration));
+        }
         file_put_contents($this->root . '/vendor/composer/installed.json', json_encode(['packages' => [[
             'name' => 'hostkurd/flocms-api',
             'install-path' => '../hostkurd/flocms-api',
@@ -66,7 +71,7 @@ final class CliKernelTest extends TestCase
         }
 
         self::assertSame(0, $tester->run(['api:install-schema']), $tester->getErrorOutput());
-        self::assertStringContainsString('driver sqlite', $tester->getDisplay());
+        self::assertStringContainsString('API schema installed (1 migration(s), driver sqlite)', $tester->getDisplay());
         self::assertSame(0, $tester->run(['api:key:create', 'Partner feed', '--scopes=a,b']));
         self::assertMatchesRegularExpression('/^flk_\d+_[0-9a-f]{40}$/m', $tester->getDisplay());
         self::assertSame(0, $tester->run(['api:key:list']));
@@ -83,6 +88,44 @@ final class CliKernelTest extends TestCase
 
         self::assertSame(0, $tester->run(['api:list']));
         self::assertStringContainsString('api:key:list', $tester->getDisplay());
+    }
+
+    public function testTheSchemaIsAMigration(): void
+    {
+        $tester = ApplicationTester::forProject($this->root);
+
+        self::assertSame(0, $tester->run(['migrate:status']));
+        self::assertMatchesRegularExpression('/2026_10_10_000000_create_api_tables +\| hostkurd\/flocms-api +\| +\| Pending/', $tester->getDisplay());
+
+        self::assertSame(0, $tester->run(['migrate']), $tester->getErrorOutput());
+        self::assertStringContainsString('hostkurd/flocms-api:2026_10_10_000000_create_api_tables', $tester->getDisplay());
+        self::assertSame(0, $tester->run(['api:install-schema']));
+        self::assertStringContainsString('API schema is up to date', $tester->getDisplay());
+        self::assertSame(['api_idempotency', 'api_keys', 'api_tokens', 'migrations'], $this->tables());
+
+        self::assertSame(0, $tester->run(['migrate:rollback']));
+        self::assertSame(['migrations'], $this->tables());
+    }
+
+    public function testSitesThatInstalledTheSchemaBeforeJustRecordIt(): void
+    {
+        $pdo = new \PDO('sqlite:' . $this->root . '/storage/database.sqlite');
+        (new \FloCMS\Api\Database\SchemaInstaller(new \FloCMS\Api\Database\Connection($pdo)))->install();
+        $pdo->exec("INSERT INTO api_keys (name, secret_hash, scopes, created_at) VALUES ('old', 'x', '[]', '2026-01-01 00:00:00')");
+        unset($pdo);
+
+        $tester = ApplicationTester::forProject($this->root);
+        self::assertSame(0, $tester->run(['migrate']), $tester->getErrorOutput());
+        self::assertSame(0, $tester->run(['api:key:list']));
+        self::assertStringContainsString('old', $tester->getDisplay());
+    }
+
+    /** @return list<string> */
+    private function tables(): array
+    {
+        $pdo = new \PDO('sqlite:' . $this->root . '/storage/database.sqlite');
+
+        return $pdo->query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")->fetchAll(\PDO::FETCH_COLUMN);
     }
 
     public function testApiRoutesAppearInRouteList(): void
