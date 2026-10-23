@@ -7,8 +7,15 @@ namespace FloCMS\Api\Security;
  * Moved to flocms-core 2.8 as \FloCMS\Core\Security\ClientIpResolver, so websites
  * without the API can use it. This name stays as an alias of the core
  * class (the same class, not a copy) until flocms-api 2.0.
+ *
+ * src/aliases.php (autoload "files") loads it on every request: PHP does not
+ * autoload a class named only in a parameter type, so an alias made on first
+ * use would leave `function f(OldName $x)` refusing objects made with the
+ * core name.
  */
-class_alias(\FloCMS\Core\Security\ClientIpResolver::class, ClientIpResolver::class);
+if (!class_exists(ClientIpResolver::class, false) && !interface_exists(ClientIpResolver::class, false)) {
+    class_alias(\FloCMS\Core\Security\ClientIpResolver::class, ClientIpResolver::class);
+}
 
 // Never runs: tells editors and static analysis that this name is deprecated.
 if (false) {

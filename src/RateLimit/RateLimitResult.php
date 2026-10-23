@@ -7,8 +7,15 @@ namespace FloCMS\Api\RateLimit;
  * Moved to flocms-core 2.8 as \FloCMS\Core\RateLimit\RateLimitResult, so websites
  * without the API can use it. This name stays as an alias of the core
  * class (the same class, not a copy) until flocms-api 2.0.
+ *
+ * src/aliases.php (autoload "files") loads it on every request: PHP does not
+ * autoload a class named only in a parameter type, so an alias made on first
+ * use would leave `function f(OldName $x)` refusing objects made with the
+ * core name.
  */
-class_alias(\FloCMS\Core\RateLimit\RateLimitResult::class, RateLimitResult::class);
+if (!class_exists(RateLimitResult::class, false) && !interface_exists(RateLimitResult::class, false)) {
+    class_alias(\FloCMS\Core\RateLimit\RateLimitResult::class, RateLimitResult::class);
+}
 
 // Never runs: tells editors and static analysis that this name is deprecated.
 if (false) {

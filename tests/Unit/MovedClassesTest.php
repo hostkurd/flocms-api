@@ -44,6 +44,23 @@ final class MovedClassesTest extends TestCase
         @rmdir($directory);
     }
 
+    /**
+     * PHP doesn't autoload a class named only in a parameter type, so the old
+     * names must exist before anything uses them (a fresh process proves it).
+     *
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
+    public function testAnOldParameterTypeAcceptsACoreObjectInAFreshProcess(): void
+    {
+        self::assertTrue(interface_exists('FloCMS\Api\RateLimit\RateLimiterInterface', false), 'the alias exists before first use');
+        $takesOld = static fn (\FloCMS\Api\RateLimit\RateLimiterInterface $limiter, \FloCMS\Api\Security\ClientIpResolver $ip): bool => true;
+
+        self::assertTrue($takesOld(new \FloCMS\Core\RateLimit\FileRateLimiter(sys_get_temp_dir() . '/flo-api-moved'), new \FloCMS\Core\Security\ClientIpResolver()));
+    }
+
     public function testAClassImplementingTheOldInterfaceStillFits(): void
     {
         $custom = new class implements \FloCMS\Api\RateLimit\RateLimiterInterface {

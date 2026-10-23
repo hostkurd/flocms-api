@@ -24,7 +24,11 @@ Requires hostkurd/flocms-core 2.8. Backward compatible. See UPGRADE.md.
 ### Deprecated
 - The `FloCMS\Api\RateLimit\` and `FloCMS\Api\Security\` names of the moved
   classes: aliases of the core classes (`class_alias`, so the same class and
-  `instanceof` holds both ways), removed in 2.0.
+  `instanceof` holds both ways), removed in 2.0. They are made when the
+  autoloader starts (`src/aliases.php`, autoload `files`): PHP does not
+  autoload a class named only in a parameter type, so code type-hinting an
+  old name (`RateLimiterInterface $limiter`) accepts objects built with the
+  core name.
 
 ## 1.2.0 - unreleased
 
