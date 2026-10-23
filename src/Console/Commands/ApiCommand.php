@@ -59,6 +59,20 @@ abstract class ApiCommand extends Command
             : $this->project()->root() . DIRECTORY_SEPARATOR . $path;
     }
 
+    /** The --routes file (api/routes.php by default), which must exist. */
+    protected function routesFile(): string
+    {
+        $option = $this->stringOption('routes') ?? 'api/routes.php';
+        $file = $this->path($option);
+        if (!is_file($file)) {
+            $this->fail($option === 'api/routes.php'
+                ? 'No api/routes.php in this site. Run `php flo api:install` to add the API.'
+                : 'API route file is missing: ' . $file);
+        }
+
+        return $file;
+    }
+
     /**
      * Columns separated by two spaces, as in flocms-api 1.1 (stable for
      * scripts that parse the output).

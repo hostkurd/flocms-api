@@ -7,9 +7,9 @@ use FloCMS\Api\Kernel;
 use FloCMS\Api\Middleware\CorsMiddleware;
 use FloCMS\Api\Middleware\ExceptionMiddleware;
 use FloCMS\Api\Middleware\RateLimitMiddleware;
-use FloCMS\Api\RateLimit\FileRateLimiter;
+use FloCMS\Core\RateLimit\FileRateLimiter;
 use FloCMS\Api\Router;
-use FloCMS\Api\Security\ClientIpResolver;
+use FloCMS\Core\Security\ClientIpResolver;
 use PHPUnit\Framework\TestCase;
 
 final class PreflightTest extends TestCase

@@ -5,7 +5,7 @@ namespace FloCMS\Api\Console\Commands;
 
 use FloCMS\Api\Idempotency\DatabaseIdempotencyStore;
 use FloCMS\Api\Idempotency\FileIdempotencyStore;
-use FloCMS\Api\RateLimit\FileRateLimiter;
+use FloCMS\Core\RateLimit\FileRateLimiter;
 use FloCMS\CLI\Console\Input\Definition;
 use FloCMS\CLI\Console\Input\Option;
 

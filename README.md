@@ -34,15 +34,23 @@ No daemons, no Node, no extra extensions (APCu is used when available).
 
 ## Installation
 
-The FloCMS skeleton (1.6+) ships with the API wired up in `public/api.php`.
-For another project:
+From FloCMS 2.0 the skeleton no longer ships the API: a website that doesn't
+need one stays lighter. Add it to a site (or pick an API setup in
+`php flo setup`, which does the same):
 
 ```bash
-composer require hostkurd/flocms-api:1.2.0
+composer require hostkurd/flocms-api:^1.3
+php flo api:install   # public/api.php, api/routes.php and example controllers
+php flo migrate       # the API tables (tokens, API keys)
 ```
 
-1.2 requires [flocms-cli](https://github.com/hostkurd/flocms-cli) 2.0, which
-runs the `php flo api:*` commands.
+`api:install` never changes a file that already exists, so it is safe to run
+again; `--minimal` writes only `public/api.php` and a routes file with the
+health check. It also tells you if `composer.json` does not load `App\Api\`
+from `api/`, or if `public/.htaccess` lacks the `/api/v1` rule.
+
+1.3 requires flocms-core 2.8 and [flocms-cli](https://github.com/hostkurd/flocms-cli) 2.0,
+which runs the `php flo api:*` commands.
 
 The database features (API keys, tokens, database idempotency store) need
 their tables. They are a migration, so they are created with the
@@ -461,7 +469,8 @@ new CorsMiddleware(
 ## Rate limiting
 
 ```php
-use FloCMS\Api\RateLimit\{FileRateLimiter, ApcuRateLimiter, RateLimiterRegistry};
+use FloCMS\Api\RateLimit\RateLimiterRegistry;
+use FloCMS\Core\RateLimit\{ApcuRateLimiter, FileRateLimiter};
 
 $store = ApcuRateLimiter::isAvailable() ? new ApcuRateLimiter() : new FileRateLimiter(ROOT . '/storage/cache/api-rate-limit');
 $limiters = new RateLimiterRegistry($store, $clientIp, [
@@ -482,6 +491,12 @@ on about 1 in 100 hits, and `php flo api:gc` does it on demand.
 
 `ClientIpResolver(['10.0.0.0/8'])` only trusts `X-Forwarded-For` from the
 listed proxies (IPs or CIDR ranges).
+
+The limiters (`RateLimiterInterface`, `RateLimitResult`, `FileRateLimiter`,
+`ApcuRateLimiter`) and the IP tools (`ClientIpResolver`, `IpMatcher`) are in
+flocms-core 2.8 (`FloCMS\Core\RateLimit\`, `FloCMS\Core\Security\`), so a
+website can use them without the API. The old `FloCMS\Api\...` names still
+work: they are aliases of the same classes, deprecated, and removed in 2.0.
 
 ## Other middleware
 
@@ -603,6 +618,7 @@ FloCMS site, whatever the age of its root `flo` file. List them with
 
 | Command | |
 |---|---|
+| `api:install [--minimal]` | add the API to the site: `public/api.php`, `api/routes.php`, example controllers (never overwrites) |
 | `api:install-schema` | run the API's migrations (create the API tables) |
 | `api:key:create <name> [--scopes=a,b] [--user=ID] [--expires=YYYY-MM-DD]` | create an API key (shown once) |
 | `api:key:list`, `api:key:revoke <id>` | |

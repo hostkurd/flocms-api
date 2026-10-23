@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.3.0 - unreleased
+
+Requires hostkurd/flocms-core 2.8. Backward compatible. See UPGRADE.md.
+
+### Added
+- `php flo api:install [--minimal]`: adds the API to a site from the
+  package's stubs (`stubs/`): `public/api.php`, `api/routes.php`, the example
+  `ContactController`, `UsersController` and `UserResource`. A file that
+  exists is never changed. It says what to add when `composer.json` does not
+  load `App\Api\` from `api/` or `public/.htaccess` lacks the `/api/v1`
+  rule. The FloCMS 2.0 skeleton no longer ships these files; its
+  `php flo setup` runs this command for the API setups.
+
+### Changed
+- `RateLimiterInterface`, `RateLimitResult`, `FileRateLimiter`,
+  `ApcuRateLimiter`, `ClientIpResolver` and `IpMatcher` moved to flocms-core
+  2.8 (`FloCMS\Core\RateLimit\`, `FloCMS\Core\Security\`). Their tests moved
+  with them.
+- `api:routes` and `api:docs` without `api/routes.php` say to run
+  `php flo api:install` instead of failing with an exception.
+
+### Deprecated
+- The `FloCMS\Api\RateLimit\` and `FloCMS\Api\Security\` names of the moved
+  classes: aliases of the core classes (`class_alias`, so the same class and
+  `instanceof` holds both ways), removed in 2.0.
+
 ## 1.2.0 - unreleased
 
 Requires hostkurd/flocms-cli 2.0 (and so flocms-core 2.2). See UPGRADE.md.

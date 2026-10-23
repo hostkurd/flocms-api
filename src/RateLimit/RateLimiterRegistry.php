@@ -4,7 +4,8 @@ declare(strict_types=1);
 namespace FloCMS\Api\RateLimit;
 
 use FloCMS\Api\Middleware\RateLimitMiddleware;
-use FloCMS\Api\Security\ClientIpResolver;
+use FloCMS\Core\RateLimit\RateLimiterInterface;
+use FloCMS\Core\Security\ClientIpResolver;
 use InvalidArgumentException;
 
 /**

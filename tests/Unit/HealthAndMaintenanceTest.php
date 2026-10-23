@@ -10,7 +10,7 @@ use FloCMS\Api\Middleware\CorsMiddleware;
 use FloCMS\Api\Middleware\ExceptionMiddleware;
 use FloCMS\Api\Middleware\MaintenanceMiddleware;
 use FloCMS\Api\Router;
-use FloCMS\Api\Security\ClientIpResolver;
+use FloCMS\Core\Security\ClientIpResolver;
 use FloCMS\Core\Http\Request;
 use PDO;
 use PHPUnit\Framework\TestCase;

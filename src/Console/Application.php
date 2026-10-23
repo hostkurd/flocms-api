@@ -44,6 +44,7 @@ final class Application
         Commands\GcCommand::class,
         Commands\RoutesCommand::class,
         Commands\DocsCommand::class,
+        Commands\InstallCommand::class,
     ];
 
     private CliApplication $cli;
