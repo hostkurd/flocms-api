@@ -7,7 +7,7 @@ use FloCMS\Api\Contracts\MiddlewareInterface;
 use FloCMS\Api\Contracts\RequestHandlerInterface;
 use FloCMS\Api\Exceptions\ApiException;
 use FloCMS\Api\Idempotency\IdempotencyStore;
-use FloCMS\Api\Security\ClientIpResolver;
+use FloCMS\Core\Security\ClientIpResolver;
 use FloCMS\Api\Security\Identity;
 use FloCMS\Core\Http\Request;
 use FloCMS\Core\Http\Response;

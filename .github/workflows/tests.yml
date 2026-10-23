@@ -49,6 +49,15 @@ jobs:
             composer require --no-update --no-interaction "hostkurd/flocms-cli:dev-release/2.0.0 as 2.0.0"
           fi
 
+      # Until hostkurd/flocms-core 2.8.0 is on Packagist, use its pull request branch
+      - name: Use the unreleased flocms-core 2.8
+        shell: bash
+        run: |
+          if ! composer show --all --no-interaction hostkurd/flocms-core 2.8.0 > /dev/null 2>&1; then
+            composer config repositories.flocms-core vcs https://github.com/hostkurd/flocms-core
+            composer require --no-update --no-interaction "hostkurd/flocms-core:dev-feat/core-2.8-security-tools as 2.8.0"
+          fi
+
       - name: Install dependencies
         run: |
           composer update --no-interaction --no-progress --prefer-dist
@@ -102,6 +111,15 @@ jobs:
           if ! composer show --all --no-interaction hostkurd/flocms-cli 2.0.0 > /dev/null 2>&1; then
             composer config repositories.flocms-cli vcs https://github.com/hostkurd/flocms-cli
             composer require --no-update --no-interaction "hostkurd/flocms-cli:dev-release/2.0.0 as 2.0.0"
+          fi
+
+      # Until hostkurd/flocms-core 2.8.0 is on Packagist, use its pull request branch
+      - name: Use the unreleased flocms-core 2.8
+        shell: bash
+        run: |
+          if ! composer show --all --no-interaction hostkurd/flocms-core 2.8.0 > /dev/null 2>&1; then
+            composer config repositories.flocms-core vcs https://github.com/hostkurd/flocms-core
+            composer require --no-update --no-interaction "hostkurd/flocms-core:dev-feat/core-2.8-security-tools as 2.8.0"
           fi
 
       - name: Install dependencies

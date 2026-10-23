@@ -1,5 +1,30 @@
 # Upgrade guide
 
+## 1.2 to 1.3
+
+1.3 requires flocms-core 2.8. Nothing breaks:
+
+- **Moved classes.** The rate limiters and the client IP tools moved to
+  flocms-core. Change the imports when convenient; the old names are aliases
+  of the same classes until 2.0:
+
+  | 1.2 | 1.3 |
+  |---|---|
+  | `FloCMS\Api\RateLimit\RateLimiterInterface` | `FloCMS\Core\RateLimit\RateLimiterInterface` |
+  | `FloCMS\Api\RateLimit\RateLimitResult` | `FloCMS\Core\RateLimit\RateLimitResult` |
+  | `FloCMS\Api\RateLimit\FileRateLimiter` | `FloCMS\Core\RateLimit\FileRateLimiter` |
+  | `FloCMS\Api\RateLimit\ApcuRateLimiter` | `FloCMS\Core\RateLimit\ApcuRateLimiter` |
+  | `FloCMS\Api\Security\ClientIpResolver` | `FloCMS\Core\Security\ClientIpResolver` |
+  | `FloCMS\Api\Security\IpMatcher` | `FloCMS\Core\Security\IpMatcher` |
+
+  `RateLimiterRegistry` and the middleware stay in flocms-api. The APCu keys
+  and the rate-limit files are unchanged, so counts carry over.
+- **`php flo api:install`** is new: it writes the API's files. A site that
+  already has `public/api.php` doesn't need it (it leaves existing files
+  alone). In 1.2, `php flo api:install` was accepted as short for
+  `api:install-schema`; a script that relied on that must now call
+  `php flo api:install-schema` (or `php flo migrate`) in full.
+
 ## 1.1 to 1.2
 
 1.2 moves the `api:*` commands into the FloCMS CLI. It requires

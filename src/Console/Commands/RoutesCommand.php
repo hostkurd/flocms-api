@@ -21,7 +21,7 @@ final class RoutesCommand extends ApiCommand
 
     protected function handle(): int
     {
-        $router = self::loadRouter($this->project()->root(), $this->path($this->stringOption('routes') ?? 'api/routes.php'), $this->stringOption('prefix') ?? '/api');
+        $router = self::loadRouter($this->project()->root(), $this->routesFile(), $this->stringOption('prefix') ?? '/api');
         $rows = [];
         foreach ($router->routes() as $route) {
             $rows[] = [

@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 namespace FloCMS\Api\Legacy;
 
-use FloCMS\Api\RateLimit\FileRateLimiter;
-use FloCMS\Api\Security\ClientIpResolver;
+use FloCMS\Core\RateLimit\FileRateLimiter;
+use FloCMS\Core\Security\ClientIpResolver;
 use FloCMS\Core\ApiController;
 use FloCMS\Core\Env;
 use FloCMS\Core\Http\Request;

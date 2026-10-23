@@ -3,14 +3,23 @@ declare(strict_types=1);
 
 namespace FloCMS\Api\RateLimit;
 
-final class RateLimitResult
-{
-    public function __construct(
-        public readonly bool $allowed,
-        public readonly int $limit,
-        public readonly int $remaining,
-        public readonly int $resetAt,
-        public readonly int $retryAfter
-    ) {
-    }
+/*
+ * Moved to flocms-core 2.8 as \FloCMS\Core\RateLimit\RateLimitResult, so websites
+ * without the API can use it. This name stays as an alias of the core
+ * class (the same class, not a copy) until flocms-api 2.0.
+ *
+ * src/aliases.php (autoload "files") loads it on every request: PHP does not
+ * autoload a class named only in a parameter type, so an alias made on first
+ * use would leave `function f(OldName $x)` refusing objects made with the
+ * core name.
+ */
+if (!class_exists(RateLimitResult::class, false) && !interface_exists(RateLimitResult::class, false)) {
+    class_alias(\FloCMS\Core\RateLimit\RateLimitResult::class, RateLimitResult::class);
+}
+
+// Never runs: tells editors and static analysis that this name is deprecated
+// and has everything the core class has.
+if (false) {
+    /** @deprecated 1.3 Use \FloCMS\Core\RateLimit\RateLimitResult (flocms-core 2.8). */
+    class RateLimitResult extends \FloCMS\Core\RateLimit\RateLimitResult {}
 }
