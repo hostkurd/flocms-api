@@ -17,8 +17,9 @@ if (!class_exists(RateLimiterInterface::class, false) && !interface_exists(RateL
     class_alias(\FloCMS\Core\RateLimit\RateLimiterInterface::class, RateLimiterInterface::class);
 }
 
-// Never runs: tells editors and static analysis that this name is deprecated.
+// Never runs: tells editors and static analysis that this name is deprecated
+// and has everything the core class has.
 if (false) {
     /** @deprecated 1.3 Use \FloCMS\Core\RateLimit\RateLimiterInterface (flocms-core 2.8). */
-    interface RateLimiterInterface {}
+    interface RateLimiterInterface extends \FloCMS\Core\RateLimit\RateLimiterInterface {}
 }

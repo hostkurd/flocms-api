@@ -17,8 +17,9 @@ if (!class_exists(ClientIpResolver::class, false) && !interface_exists(ClientIpR
     class_alias(\FloCMS\Core\Security\ClientIpResolver::class, ClientIpResolver::class);
 }
 
-// Never runs: tells editors and static analysis that this name is deprecated.
+// Never runs: tells editors and static analysis that this name is deprecated
+// and has everything the core class has.
 if (false) {
     /** @deprecated 1.3 Use \FloCMS\Core\Security\ClientIpResolver (flocms-core 2.8). */
-    class ClientIpResolver {}
+    class ClientIpResolver extends \FloCMS\Core\Security\ClientIpResolver {}
 }

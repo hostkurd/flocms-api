@@ -62,7 +62,7 @@ TXT;
                 continue;
             }
             $path = $project->path($target);
-            if (is_file($path)) {
+            if (is_file($path) || is_link($path)) {
                 $this->note($target . ' already exists: left as it is.');
                 continue;
             }
@@ -71,15 +71,20 @@ TXT;
             if (!is_dir($directory) && !@mkdir($directory, 0755, true) && !is_dir($directory)) {
                 $this->fail('Could not create ' . dirname($target) . '/: check the folder permissions.');
             }
-            if (@file_put_contents($path, $contents, LOCK_EX) === false) {
-                $this->fail('Could not write ' . $target . ': check the folder permissions.');
+            // 'x' never writes through an existing file or a dangling symlink
+            $handle = @fopen($path, 'x');
+            if ($handle === false || fwrite($handle, $contents) !== strlen($contents)) {
+                $this->fail('Could not write ' . $target . ': check the folder permissions (or remove a broken link there).');
             }
+            fclose($handle);
             $this->success('Created ' . $target);
             $written++;
         }
 
         if ($written === 0) {
             $this->line('Nothing to add: the API is already installed.');
+            // Before 1.3, `php flo api:install` was short for api:install-schema.
+            $this->line('To create the API tables run `php flo migrate` (or `php flo api:install-schema`).');
         }
 
         $this->checkAutoload($project->path('composer.json'));

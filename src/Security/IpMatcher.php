@@ -17,8 +17,9 @@ if (!class_exists(IpMatcher::class, false) && !interface_exists(IpMatcher::class
     class_alias(\FloCMS\Core\Security\IpMatcher::class, IpMatcher::class);
 }
 
-// Never runs: tells editors and static analysis that this name is deprecated.
+// Never runs: tells editors and static analysis that this name is deprecated
+// and has everything the core class has.
 if (false) {
     /** @deprecated 1.3 Use \FloCMS\Core\Security\IpMatcher (flocms-core 2.8). */
-    class IpMatcher {}
+    class IpMatcher extends \FloCMS\Core\Security\IpMatcher {}
 }

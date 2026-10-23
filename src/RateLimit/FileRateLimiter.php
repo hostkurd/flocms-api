@@ -17,8 +17,9 @@ if (!class_exists(FileRateLimiter::class, false) && !interface_exists(FileRateLi
     class_alias(\FloCMS\Core\RateLimit\FileRateLimiter::class, FileRateLimiter::class);
 }
 
-// Never runs: tells editors and static analysis that this name is deprecated.
+// Never runs: tells editors and static analysis that this name is deprecated
+// and has everything the core class has.
 if (false) {
     /** @deprecated 1.3 Use \FloCMS\Core\RateLimit\FileRateLimiter (flocms-core 2.8). */
-    class FileRateLimiter {}
+    class FileRateLimiter extends \FloCMS\Core\RateLimit\FileRateLimiter {}
 }

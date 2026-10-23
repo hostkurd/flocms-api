@@ -17,8 +17,9 @@ if (!class_exists(RateLimitResult::class, false) && !interface_exists(RateLimitR
     class_alias(\FloCMS\Core\RateLimit\RateLimitResult::class, RateLimitResult::class);
 }
 
-// Never runs: tells editors and static analysis that this name is deprecated.
+// Never runs: tells editors and static analysis that this name is deprecated
+// and has everything the core class has.
 if (false) {
     /** @deprecated 1.3 Use \FloCMS\Core\RateLimit\RateLimitResult (flocms-core 2.8). */
-    class RateLimitResult {}
+    class RateLimitResult extends \FloCMS\Core\RateLimit\RateLimitResult {}
 }

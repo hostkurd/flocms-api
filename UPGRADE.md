@@ -19,8 +19,11 @@
 
   `RateLimiterRegistry` and the middleware stay in flocms-api. The APCu keys
   and the rate-limit files are unchanged, so counts carry over.
-- **`php flo api:install`** is new. A site that already has `public/api.php`
-  doesn't need it (it leaves existing files alone).
+- **`php flo api:install`** is new: it writes the API's files. A site that
+  already has `public/api.php` doesn't need it (it leaves existing files
+  alone). In 1.2, `php flo api:install` was accepted as short for
+  `api:install-schema`; a script that relied on that must now call
+  `php flo api:install-schema` (or `php flo migrate`) in full.
 
 ## 1.1 to 1.2
 

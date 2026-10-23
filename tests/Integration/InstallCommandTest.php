@@ -78,7 +78,22 @@ final class InstallCommandTest extends TestCase
         file_put_contents($this->root . '/public/api.php', "<?php // edited\n");
         self::assertSame(0, $tester->run(['api:install']));
         self::assertStringContainsString('Nothing to add', $tester->getDisplay());
+        self::assertStringContainsString('php flo api:install-schema', $tester->getDisplay());
         self::assertSame("<?php // edited\n", file_get_contents($this->root . '/public/api.php'));
+    }
+
+    public function testItNeverWritesThroughABrokenLink(): void
+    {
+        if (DIRECTORY_SEPARATOR === '\\') {
+            self::markTestSkipped('symlinks need extra rights on Windows');
+        }
+        $outside = $this->root . '-outside.php';
+        symlink($outside, $this->root . '/public/api.php');
+        $tester = ApplicationTester::forProject($this->root);
+
+        self::assertSame(0, $tester->run(['api:install']), $tester->getErrorOutput());
+        self::assertFileDoesNotExist($outside);
+        self::assertStringContainsString('public/api.php already exists: left as it is.', $tester->getDisplay());
     }
 
     public function testMinimalWritesOnlyTheFrontControllerAndAHealthRoute(): void

@@ -17,8 +17,9 @@ if (!class_exists(ApcuRateLimiter::class, false) && !interface_exists(ApcuRateLi
     class_alias(\FloCMS\Core\RateLimit\ApcuRateLimiter::class, ApcuRateLimiter::class);
 }
 
-// Never runs: tells editors and static analysis that this name is deprecated.
+// Never runs: tells editors and static analysis that this name is deprecated
+// and has everything the core class has.
 if (false) {
     /** @deprecated 1.3 Use \FloCMS\Core\RateLimit\ApcuRateLimiter (flocms-core 2.8). */
-    class ApcuRateLimiter {}
+    class ApcuRateLimiter extends \FloCMS\Core\RateLimit\ApcuRateLimiter {}
 }

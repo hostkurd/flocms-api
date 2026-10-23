@@ -11,7 +11,9 @@ Requires hostkurd/flocms-core 2.8. Backward compatible. See UPGRADE.md.
   exists is never changed. It says what to add when `composer.json` does not
   load `App\Api\` from `api/` or `public/.htaccess` lacks the `/api/v1`
   rule. The FloCMS 2.0 skeleton no longer ships these files; its
-  `php flo setup` runs this command for the API setups.
+  `php flo setup` runs this command for the API setups. Scripts that called
+  `php flo api:install` as short for `api:install-schema` must use the full
+  name.
 
 ### Changed
 - `RateLimiterInterface`, `RateLimitResult`, `FileRateLimiter`,
